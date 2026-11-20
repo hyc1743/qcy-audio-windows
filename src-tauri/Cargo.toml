@@ -1,0 +1,21 @@
+[package]
+name = "qcy-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Clean-room Windows desktop companion app for QCY audio devices"
+
+[lib]
+name = "qcy_desktop_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+qcy-core.workspace = true
+qcy-models.workspace = true
+qcy-transport.workspace = true
+serde.workspace = true
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tokio.workspace = true

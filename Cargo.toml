@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/qcy-transport",
+    "crates/qcy-protocol",
+    "crates/qcy-models",
+    "crates/qcy-simulator",
+    "crates/qcy-core",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+windows = { version = "0.62", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Storage_Streams",
+    "Networking",
+    "Networking_Sockets",
+    "Devices_Enumeration",
+    "Devices_Bluetooth",
+    "Devices_Bluetooth_GenericAttributeProfile",
+    "Devices_Bluetooth_Rfcomm",
+    "Devices_Bluetooth_Advertisement",
+] }
+
+qcy-transport = { path = "crates/qcy-transport" }
+qcy-protocol = { path = "crates/qcy-protocol" }
+qcy-models = { path = "crates/qcy-models" }
+qcy-simulator = { path = "crates/qcy-simulator" }
+qcy-core = { path = "crates/qcy-core" }
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = "s"

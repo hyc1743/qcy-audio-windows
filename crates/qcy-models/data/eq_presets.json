@@ -1,0 +1,578 @@
+{
+  "schema_version": 1,
+  "description": "Clean-room QCY Audio EQ presets, standard frequency grids, 9 IIR biquad filter metadata, reference target FR curves, and 8-band personalized hearing test configuration.",
+  "frequency_grids": {
+    "bands_5_hz": [31, 125, 500, 2000, 8000],
+    "bands_10_hz": [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    "bands_10_peq_hz": [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    "bands_20_hz": [
+      20, 31, 45, 63, 90, 125, 180, 250, 355, 500,
+      710, 1000, 1400, 2000, 2800, 4000, 5600, 8000, 11200, 16000
+    ],
+    "freq_min_hz": 20,
+    "freq_max_hz": 20000,
+    "gain_min_db": -12.0,
+    "gain_max_db": 12.0,
+    "q_min": 0.2,
+    "q_max": 10.0,
+    "q_default": 1.0
+  },
+  "filter_types": [
+    {
+      "index": 0,
+      "id": "high_pass",
+      "name_en": "High Pass",
+      "name_zh": "高通",
+      "description_en": "Attenuates frequencies below the cutoff frequency (12 dB/oct).",
+      "description_zh": "衰减截止频率以下的低频信号（12 dB/倍频程）。",
+      "supports_gain": false,
+      "supports_q": true,
+      "default_q": 0.707
+    },
+    {
+      "index": 1,
+      "id": "low_pass",
+      "name_en": "Low Pass",
+      "name_zh": "低通",
+      "description_en": "Attenuates frequencies above the cutoff frequency (12 dB/oct).",
+      "description_zh": "衰减截止频率以上的高频信号（12 dB/倍频程）。",
+      "supports_gain": false,
+      "supports_q": true,
+      "default_q": 0.707
+    },
+    {
+      "index": 2,
+      "id": "peak",
+      "name_en": "Peak",
+      "name_zh": "峰值",
+      "description_en": "Bell-shaped boost or cut centered at the target frequency.",
+      "description_zh": "以中心频率为核心进行钟形增益或衰减。",
+      "supports_gain": true,
+      "supports_q": true,
+      "default_q": 1.41
+    },
+    {
+      "index": 3,
+      "id": "high_shelf",
+      "name_en": "High Shelf",
+      "name_zh": "高架",
+      "description_en": "Uniformly boosts or cuts frequencies above the shelf corner.",
+      "description_zh": "对转折频率以上的高频段整体提升或衰减。",
+      "supports_gain": true,
+      "supports_q": false,
+      "default_q": 0.707
+    },
+    {
+      "index": 4,
+      "id": "low_shelf",
+      "name_en": "Low Shelf",
+      "name_zh": "低架",
+      "description_en": "Uniformly boosts or cuts frequencies below the shelf corner.",
+      "description_zh": "对转折频率以下的低频段整体提升或衰减。",
+      "supports_gain": true,
+      "supports_q": false,
+      "default_q": 0.707
+    },
+    {
+      "index": 5,
+      "id": "high_shelf_q",
+      "name_en": "High Shelf Q",
+      "name_zh": "高架 Q",
+      "description_en": "High-shelf filter with adjustable transition slope via Q factor.",
+      "description_zh": "支持通过 Q 值调节斜率的高架滤波器。",
+      "supports_gain": true,
+      "supports_q": true,
+      "default_q": 0.707
+    },
+    {
+      "index": 6,
+      "id": "low_shelf_q",
+      "name_en": "Low Shelf Q",
+      "name_zh": "低架 Q",
+      "description_en": "Low-shelf filter with adjustable transition slope via Q factor.",
+      "description_zh": "支持通过 Q 值调节斜率的低架滤波器。",
+      "supports_gain": true,
+      "supports_q": true,
+      "default_q": 0.707
+    },
+    {
+      "index": 7,
+      "id": "high_pass_advance",
+      "name_en": "High Pass Advance",
+      "name_zh": "高阶高通",
+      "description_en": "Steeper Butterworth high-pass roll-off for aggressive sub-bass filtering.",
+      "description_zh": "更陡峭的高阶巴特沃斯高通滤波，用于深度削减极低频。",
+      "supports_gain": false,
+      "supports_q": true,
+      "default_q": 0.707
+    },
+    {
+      "index": 8,
+      "id": "low_pass_advance",
+      "name_en": "Low Pass Advance",
+      "name_zh": "高阶低通",
+      "description_en": "Steeper Butterworth low-pass roll-off for smooth treble limiting.",
+      "description_zh": "更陡峭的高阶巴特沃斯低通滤波，用于平滑削减极高频。",
+      "supports_gain": false,
+      "supports_q": true,
+      "default_q": 0.707
+    }
+  ],
+  "presets": [
+    {
+      "id": "default",
+      "eq_index": 1,
+      "category": "official",
+      "name_en": "Default",
+      "name_zh": "默认",
+      "subtitle_en": "Balanced and natural for everyday listening",
+      "subtitle_zh": "均衡自然，适合日常聆听",
+      "master_gain_db": 0.0,
+      "gains_10band_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "parametric_bands": []
+    },
+    {
+      "id": "pop",
+      "eq_index": 2,
+      "category": "official",
+      "name_en": "Pop",
+      "name_zh": "流行",
+      "subtitle_en": "Crisp rhythm and engaging melodies",
+      "subtitle_zh": "节奏鲜明，旋律更抓耳",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [1.5, 2.5, 1.5, 0.0, -0.5, 0.5, 2.0, 2.5, 2.0, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 75, "gain_db": 2.5, "q": 0.9, "filter_type": 4 },
+        { "freq_hz": 450, "gain_db": -0.8, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 3200, "gain_db": 2.4, "q": 1.4, "filter_type": 2 },
+        { "freq_hz": 9000, "gain_db": 1.8, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "heavy_bass",
+      "eq_index": 3,
+      "category": "official",
+      "name_en": "Heavy Bass",
+      "name_zh": "重低音",
+      "subtitle_en": "Deep, punchy low-end impact",
+      "subtitle_zh": "低频澎湃，震撼有力",
+      "master_gain_db": -3.0,
+      "gains_10band_db": [5.5, 6.0, 4.5, 2.0, 0.0, -0.5, 0.0, 0.5, 1.0, 0.5],
+      "parametric_bands": [
+        { "freq_hz": 65, "gain_db": 6.0, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 160, "gain_db": 2.5, "q": 1.1, "filter_type": 2 },
+        { "freq_hz": 900, "gain_db": -0.8, "q": 1.0, "filter_type": 2 },
+        { "freq_hz": 8000, "gain_db": 0.8, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "rock",
+      "eq_index": 4,
+      "category": "official",
+      "name_en": "Rock",
+      "name_zh": "摇滚",
+      "subtitle_en": "Driving drums and electric energy",
+      "subtitle_zh": "鼓点强烈，激情澎湃",
+      "master_gain_db": -2.0,
+      "gains_10band_db": [3.5, 4.0, 2.0, -0.5, -1.5, 0.5, 2.5, 3.5, 3.0, 1.5],
+      "parametric_bands": [
+        { "freq_hz": 70, "gain_db": 4.0, "q": 0.9, "filter_type": 4 },
+        { "freq_hz": 500, "gain_db": -1.5, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 3500, "gain_db": 3.2, "q": 1.3, "filter_type": 2 },
+        { "freq_hz": 9500, "gain_db": 2.2, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "soft",
+      "eq_index": 5,
+      "category": "official",
+      "name_en": "Soft",
+      "name_zh": "柔和",
+      "subtitle_en": "Warm, smooth, and fatigue-free",
+      "subtitle_zh": "音色温润，舒缓耐听",
+      "master_gain_db": -0.5,
+      "gains_10band_db": [-1.0, 0.0, 1.0, 1.5, 1.0, 0.5, -0.5, -1.5, -2.5, -3.0],
+      "parametric_bands": [
+        { "freq_hz": 200, "gain_db": 1.4, "q": 0.9, "filter_type": 2 },
+        { "freq_hz": 4500, "gain_db": -1.6, "q": 1.1, "filter_type": 2 },
+        { "freq_hz": 9000, "gain_db": -2.6, "q": 0.7, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "classical",
+      "eq_index": 6,
+      "category": "official",
+      "name_en": "Classical",
+      "name_zh": "古典",
+      "subtitle_en": "Layered soundstage and acoustic detail",
+      "subtitle_zh": "层次分明，细节丰富",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [2.0, 1.5, 0.5, -0.5, 0.0, 0.5, 1.5, 2.5, 3.5, 2.5],
+      "parametric_bands": [
+        { "freq_hz": 55, "gain_db": 2.0, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 300, "gain_db": -0.6, "q": 1.1, "filter_type": 2 },
+        { "freq_hz": 4000, "gain_db": 2.2, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 10000, "gain_db": 3.0, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "bass_boost",
+      "eq_index": 7,
+      "category": "official",
+      "name_en": "Bass Boost",
+      "name_zh": "低音增强",
+      "subtitle_en": "Tight sub-bass lift with clean mids",
+      "subtitle_zh": "低频有力，氛围感十足",
+      "master_gain_db": -2.5,
+      "gains_10band_db": [4.5, 5.0, 3.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5, 0.0],
+      "parametric_bands": [
+        { "freq_hz": 80, "gain_db": 4.8, "q": 0.85, "filter_type": 4 },
+        { "freq_hz": 220, "gain_db": -1.0, "q": 1.4, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "audiobook",
+      "eq_index": 8,
+      "category": "official",
+      "name_en": "Audiobook",
+      "name_zh": "听书",
+      "subtitle_en": "Clear spoken voice and reduced rumble",
+      "subtitle_zh": "强化人声，对白更清楚",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [-4.0, -3.5, -2.0, 0.5, 2.5, 3.5, 3.0, 1.0, -1.5, -3.0],
+      "parametric_bands": [
+        { "freq_hz": 90, "gain_db": 0.0, "q": 0.707, "filter_type": 0 },
+        { "freq_hz": 1200, "gain_db": 3.5, "q": 1.0, "filter_type": 2 },
+        { "freq_hz": 8500, "gain_db": -2.2, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "adaptive_eq",
+      "eq_index": 9,
+      "category": "official",
+      "name_en": "Adaptive EQ",
+      "name_zh": "自适应",
+      "subtitle_en": "Dynamically balances loudness across environments",
+      "subtitle_zh": "自动调节音效，适配当下环境",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [1.5, 1.5, 0.5, 0.0, 0.0, 0.5, 1.0, 1.5, 1.5, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 80, "gain_db": 1.5, "q": 0.75, "filter_type": 4 },
+        { "freq_hz": 6000, "gain_db": 1.5, "q": 0.75, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "spatial",
+      "eq_index": 10,
+      "category": "official",
+      "name_en": "Spatial Sound",
+      "name_zh": "空间音效",
+      "subtitle_en": "Expansive surround-style presentation",
+      "subtitle_zh": "立体环绕，营造沉浸氛围",
+      "master_gain_db": -2.0,
+      "gains_10band_db": [2.0, 1.5, 0.0, -1.0, -0.5, 0.5, 2.0, 3.0, 3.5, 2.5],
+      "parametric_bands": [
+        { "freq_hz": 60, "gain_db": 2.0, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 350, "gain_db": -1.0, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 6500, "gain_db": 3.2, "q": 1.0, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "personalized",
+      "eq_index": 11,
+      "category": "personalized",
+      "name_en": "Personalized Audio",
+      "name_zh": "个性化听感",
+      "subtitle_en": "Tailored to your 8-band hearing test results",
+      "subtitle_zh": "测试你的听力特征，增强耳机音质",
+      "master_gain_db": -3.0,
+      "gains_10band_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "parametric_bands": []
+    },
+    {
+      "id": "gaming",
+      "eq_index": 13,
+      "category": "official",
+      "name_en": "Gaming",
+      "name_zh": "游戏模式",
+      "subtitle_en": "Enhanced footsteps and positional audio cues",
+      "subtitle_zh": "强化脚步声与方位定位，沉浸感更强",
+      "master_gain_db": -2.0,
+      "gains_10band_db": [1.0, 0.5, -1.5, -1.0, 0.5, 1.5, 3.5, 4.5, 3.0, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 160, "gain_db": -1.8, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 3200, "gain_db": 4.2, "q": 1.3, "filter_type": 2 },
+        { "freq_hz": 7500, "gain_db": 2.8, "q": 1.2, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "comfort_soundstage",
+      "eq_index": 14,
+      "category": "official",
+      "name_en": "Comfort Soundstage",
+      "name_zh": "舒适声场",
+      "subtitle_en": "Tames harsh treble for long listening sessions",
+      "subtitle_zh": "削弱刺耳感，声音更柔和",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [1.0, 1.5, 0.5, 0.0, 0.0, 0.5, 0.0, -1.5, -3.0, -2.0],
+      "parametric_bands": [
+        { "freq_hz": 75, "gain_db": 1.4, "q": 0.9, "filter_type": 4 },
+        { "freq_hz": 6800, "gain_db": -3.2, "q": 1.8, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "soft_immersion",
+      "eq_index": 15,
+      "category": "official",
+      "name_en": "Soft Immersion",
+      "name_zh": "柔和沉浸",
+      "subtitle_en": "Warm, enveloping acoustic texture",
+      "subtitle_zh": "温暖包裹，沉浸体验",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [2.0, 2.5, 2.0, 1.0, 0.0, -0.5, 0.0, 0.5, -0.5, -1.0],
+      "parametric_bands": [
+        { "freq_hz": 110, "gain_db": 2.4, "q": 0.85, "filter_type": 4 },
+        { "freq_hz": 1200, "gain_db": -0.6, "q": 1.1, "filter_type": 2 },
+        { "freq_hz": 10000, "gain_db": -1.0, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "original_boost",
+      "eq_index": 16,
+      "category": "official",
+      "name_en": "Original Acoustics",
+      "name_zh": "原音增强",
+      "subtitle_en": "Transparent micro-detail and crisp transients",
+      "subtitle_zh": "还原细节，音质更真实",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [0.5, 0.5, 0.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 2.0],
+      "parametric_bands": [
+        { "freq_hz": 2500, "gain_db": 1.4, "q": 1.3, "filter_type": 2 },
+        { "freq_hz": 8500, "gain_db": 2.4, "q": 0.9, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "pure_vocal",
+      "eq_index": 17,
+      "category": "official",
+      "name_en": "Pure Vocal",
+      "name_zh": "纯净人声",
+      "subtitle_en": "Forward, expressive midrange vocals",
+      "subtitle_zh": "人声清晰，情感更突出",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [-1.5, -1.0, -0.5, 1.0, 2.5, 3.5, 3.0, 1.5, 0.0, -1.0],
+      "parametric_bands": [
+        { "freq_hz": 120, "gain_db": -1.2, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 1100, "gain_db": 3.4, "q": 1.0, "filter_type": 2 },
+        { "freq_hz": 2800, "gain_db": 2.0, "q": 1.4, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "studio_master",
+      "eq_index": 19,
+      "category": "official",
+      "name_en": "Studio Master",
+      "name_zh": "臻品音效",
+      "subtitle_en": "Neutral reference tuning across all three bands",
+      "subtitle_zh": "三频均衡，听感平和",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [1.0, 0.5, 0.0, -0.5, 0.0, 0.5, 1.0, 1.0, 1.5, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 50, "gain_db": 1.0, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 260, "gain_db": -0.6, "q": 1.2, "filter_type": 2 },
+        { "freq_hz": 7500, "gain_db": 1.4, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "speaker_normal",
+      "eq_index": 1,
+      "category": "speaker",
+      "name_en": "Normal",
+      "name_zh": "普通",
+      "subtitle_en": "Balanced indoor Bluetooth speaker playback",
+      "subtitle_zh": "均衡室内音箱回放",
+      "master_gain_db": 0.0,
+      "gains_10band_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "parametric_bands": []
+    },
+    {
+      "id": "speaker_outdoor",
+      "eq_index": 2,
+      "category": "speaker",
+      "name_en": "Outdoor",
+      "name_zh": "户外",
+      "subtitle_en": "Higher presence and projection for open spaces",
+      "subtitle_zh": "增强穿透力，适配户外开阔空间",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [-1.0, 0.5, 1.5, 1.5, 2.0, 2.5, 3.0, 3.0, 2.0, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 60, "gain_db": 0.0, "q": 0.707, "filter_type": 0 },
+        { "freq_hz": 2200, "gain_db": 3.0, "q": 1.0, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "speaker_ambient",
+      "eq_index": 3,
+      "category": "speaker",
+      "name_en": "Ambient",
+      "name_zh": "氛围",
+      "subtitle_en": "Full warm bass and relaxed room-filling glow",
+      "subtitle_zh": "饱满低频，营造轻松氛围感",
+      "master_gain_db": -2.0,
+      "gains_10band_db": [3.5, 4.0, 2.5, 1.0, 0.0, -0.5, 0.5, 1.0, 1.5, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 85, "gain_db": 3.8, "q": 0.85, "filter_type": 4 },
+        { "freq_hz": 9000, "gain_db": 1.2, "q": 0.8, "filter_type": 3 }
+      ]
+    },
+    {
+      "id": "podcast_voice",
+      "eq_index": null,
+      "category": "curated",
+      "name_en": "Podcast & Meetings",
+      "name_zh": "播客与会议",
+      "subtitle_en": "Desktop clarity boost for voice calls and podcasts",
+      "subtitle_zh": "优化桌面语音通话与播客清晰度",
+      "master_gain_db": -1.0,
+      "gains_10band_db": [-3.5, -2.5, -1.5, 0.0, 2.0, 3.0, 2.5, 1.0, -1.0, -2.0],
+      "parametric_bands": [
+        { "freq_hz": 100, "gain_db": 0.0, "q": 0.707, "filter_type": 0 },
+        { "freq_hz": 1400, "gain_db": 3.0, "q": 1.1, "filter_type": 2 }
+      ]
+    },
+    {
+      "id": "late_night",
+      "eq_index": null,
+      "category": "curated",
+      "name_en": "Late Night",
+      "name_zh": "深夜轻听",
+      "subtitle_en": "Gentle loudness curve for quiet low-volume listening",
+      "subtitle_zh": "小音量补偿曲线，适合夜间轻声聆听",
+      "master_gain_db": -1.5,
+      "gains_10band_db": [2.5, 2.0, 1.0, 0.0, -0.5, -0.5, 0.0, 0.5, 1.5, 1.0],
+      "parametric_bands": [
+        { "freq_hz": 70, "gain_db": 2.4, "q": 0.8, "filter_type": 4 },
+        { "freq_hz": 8000, "gain_db": 1.4, "q": 0.8, "filter_type": 3 }
+      ]
+    }
+  ],
+  "target_curves": [
+    {
+      "id": "flat_reference",
+      "name_en": "Flat Reference (0 dB)",
+      "name_zh": "平直参考曲线 (0 dB)",
+      "description_en": "Neutral zero-dB baseline for direct PEQ delta editing.",
+      "description_zh": "零增益基准线，适合直观编辑参数均衡偏移量。",
+      "points": [
+        { "freq_hz": 20, "db": 0.0 },
+        { "freq_hz": 50, "db": 0.0 },
+        { "freq_hz": 100, "db": 0.0 },
+        { "freq_hz": 250, "db": 0.0 },
+        { "freq_hz": 500, "db": 0.0 },
+        { "freq_hz": 1000, "db": 0.0 },
+        { "freq_hz": 2000, "db": 0.0 },
+        { "freq_hz": 4000, "db": 0.0 },
+        { "freq_hz": 8000, "db": 0.0 },
+        { "freq_hz": 16000, "db": 0.0 },
+        { "freq_hz": 20000, "db": 0.0 }
+      ]
+    },
+    {
+      "id": "harman_ie_2019",
+      "name_en": "In-Ear Target (Harman-Style)",
+      "name_zh": "入耳参考目标曲线 (哈曼风格)",
+      "description_en": "Clean-room smoothed in-ear preference target with sub-bass lift and 3 kHz pinna gain.",
+      "description_zh": "平滑入耳听感参考曲线，具备适度超低频抬升与 3 kHz 人耳耳廓增益。",
+      "points": [
+        { "freq_hz": 20, "db": 4.8 },
+        { "freq_hz": 40, "db": 5.0 },
+        { "freq_hz": 80, "db": 3.8 },
+        { "freq_hz": 160, "db": 1.2 },
+        { "freq_hz": 300, "db": 0.0 },
+        { "freq_hz": 600, "db": 0.0 },
+        { "freq_hz": 1000, "db": 0.5 },
+        { "freq_hz": 2000, "db": 3.5 },
+        { "freq_hz": 3000, "db": 5.5 },
+        { "freq_hz": 5000, "db": 3.2 },
+        { "freq_hz": 8000, "db": 1.0 },
+        { "freq_hz": 12000, "db": -1.2 },
+        { "freq_hz": 16000, "db": -3.5 },
+        { "freq_hz": 20000, "db": -5.0 }
+      ]
+    },
+    {
+      "id": "harman_oe_2018",
+      "name_en": "Over-Ear Target (Harman-Style)",
+      "name_zh": "头戴参考目标曲线 (哈曼风格)",
+      "description_en": "Clean-room smoothed over-ear preference curve tailored for circumaural headphones.",
+      "description_zh": "适配头戴式耳机的平滑参考听感曲线。",
+      "points": [
+        { "freq_hz": 20, "db": 3.5 },
+        { "freq_hz": 40, "db": 4.0 },
+        { "freq_hz": 80, "db": 3.0 },
+        { "freq_hz": 160, "db": 1.0 },
+        { "freq_hz": 300, "db": 0.0 },
+        { "freq_hz": 1000, "db": 0.0 },
+        { "freq_hz": 2000, "db": 2.2 },
+        { "freq_hz": 3200, "db": 4.2 },
+        { "freq_hz": 5500, "db": 2.0 },
+        { "freq_hz": 8000, "db": 0.5 },
+        { "freq_hz": 12000, "db": -0.8 },
+        { "freq_hz": 16000, "db": -2.5 },
+        { "freq_hz": 20000, "db": -4.0 }
+      ]
+    },
+    {
+      "id": "diffuse_field_tilt",
+      "name_en": "Studio Diffuse-Field (-1 dB/oct)",
+      "name_zh": "监听扩散场倾斜曲线",
+      "description_en": "Natural studio monitor tilt for analytical acoustic listening.",
+      "description_zh": "接近监听音箱的温和倾斜曲线，适合原声与解析聆听。",
+      "points": [
+        { "freq_hz": 20, "db": 2.5 },
+        { "freq_hz": 60, "db": 2.0 },
+        { "freq_hz": 200, "db": 1.0 },
+        { "freq_hz": 500, "db": 0.4 },
+        { "freq_hz": 1000, "db": 0.0 },
+        { "freq_hz": 2500, "db": 1.8 },
+        { "freq_hz": 4000, "db": 1.5 },
+        { "freq_hz": 8000, "db": -0.5 },
+        { "freq_hz": 16000, "db": -2.5 },
+        { "freq_hz": 20000, "db": -3.5 }
+      ]
+    },
+    {
+      "id": "warm_bass_target",
+      "name_en": "Warm Bass Preference",
+      "name_zh": "温暖重低音目标曲线",
+      "description_en": "Relaxed upper treble with rich, full-bodied low frequencies.",
+      "description_zh": "低频饱满温暖、高频柔和不刺耳的流行向参考曲线。",
+      "points": [
+        { "freq_hz": 20, "db": 6.0 },
+        { "freq_hz": 50, "db": 6.2 },
+        { "freq_hz": 120, "db": 4.0 },
+        { "freq_hz": 250, "db": 1.5 },
+        { "freq_hz": 500, "db": 0.0 },
+        { "freq_hz": 1000, "db": 0.0 },
+        { "freq_hz": 2500, "db": 1.8 },
+        { "freq_hz": 4000, "db": 1.0 },
+        { "freq_hz": 8000, "db": -1.5 },
+        { "freq_hz": 16000, "db": -3.5 },
+        { "freq_hz": 20000, "db": -4.5 }
+      ]
+    }
+  ],
+  "hearing_test": {
+    "eq_index": 11,
+    "bands_hz": [63, 125, 250, 500, 1000, 2000, 4000, 8000],
+    "audiometry_alt_bands_hz": [125, 250, 500, 1000, 2000, 4000, 6000, 8000],
+    "default_q": 0.7,
+    "filter_type": 2,
+    "master_gain_db": -3.0,
+    "reference_sound_db": [-65.3, -68.0, -72.6, -80.7, -86.9, -90.3, -90.4, -81.6],
+    "min_compensation_db": -3.0,
+    "max_compensation_db": 6.0,
+    "tone_duration_ms": 800,
+    "steps_per_band": 5
+  }
+}

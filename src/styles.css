@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* Enable explicit class-based dark mode switching (System / Light / Dark) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --qcy-brand: #ff7a2f;
+  --qcy-accent: #0066ff;
+  --qcy-bg: #f2f1f6;
+  --qcy-card: #ffffff;
+  --qcy-text: #1a1a1a;
+  --qcy-border: #e5e5e5;
+}
+
+.dark {
+  color-scheme: dark;
+  --qcy-brand: #ff7a2f;
+  --qcy-accent: #3399ff;
+  --qcy-bg: #121212;
+  --qcy-card: #1e1e1e;
+  --qcy-text: #ffffff;
+  --qcy-border: rgba(255, 255, 255, 0.1);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", system-ui, -apple-system, sans-serif;
+  background-color: var(--qcy-bg);
+  color: var(--qcy-text);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+/* Transparent frameless canvas for dedicated Tauri Connection Pop-Up window */
+html.qcy-popup-window,
+html.qcy-popup-window body,
+html.qcy-popup-window #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* Fluent-style thin scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(128, 128, 128, 0.32);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 122, 47, 0.65);
+}

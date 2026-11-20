@@ -1,0 +1,19 @@
+[package]
+name = "qcy-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Application services, session state machine, settings and EQ preset management for QCY Desktop"
+
+[dependencies]
+qcy-models.workspace = true
+qcy-protocol.workspace = true
+qcy-simulator.workspace = true
+qcy-transport.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]

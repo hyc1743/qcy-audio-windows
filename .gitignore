@@ -1,0 +1,57 @@
+# === Mobile packages & reverse-engineering artifacts (NEVER COMMIT) ===
+*.apk
+*.xapk
+*.apks
+*.aab
+*.dex
+*.odex
+*.vdex
+*.so
+*.jar
+*.class
+*.smali
+scratch/
+decompiled/
+jadx-out/
+apktool-out/
+
+# === Rust / Cargo ===
+/target/
+src-tauri/target/
+src-tauri/gen/schemas/
+**/target/
+**/*.rs.bk
+
+# === Node / Frontend ===
+node_modules/
+dist/
+dist-portable/
+release-assets/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# === Secrets, certificates & environment ===
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets/
+
+# === OS & Editor temp files ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+*.swo
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/

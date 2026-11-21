@@ -55,8 +55,8 @@ jobs:
           if ($stderr) { Write-Host $stderr }
           Remove-Item -Force -ErrorAction SilentlyContinue $out, $err
           if ($p.ExitCode -ne 0) { throw "smoke-test exited with $($p.ExitCode)" }
-          if ($stdout -notmatch "SMOKE_TEST_OK:" -or $stdout -match "localhost:1420" -or $stdout -notmatch "dev_build=false" -or $stdout -notmatch "index_has_script=true") {
-            throw "smoke-test did not verify embedded custom-protocol assets"
+          if ($stdout -notmatch "SMOKE_TEST_OK:" -or $stdout -match "localhost:1420" -or $stdout -notmatch "dev_build=false" -or $stdout -notmatch "index_has_script=true" -or $stdout -notmatch "simulator_enabled=false" -or $stdout -notmatch "connection_state=disconnected" -or $stdout -notmatch "active_device=none") {
+            throw "smoke-test did not verify embedded custom-protocol assets and clean disconnected default"
           }
 
       - name: Package Portable ZIP & SHA256SUMS

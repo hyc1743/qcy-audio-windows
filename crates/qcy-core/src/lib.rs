@@ -41,7 +41,9 @@ pub mod state_sync;
 pub mod storage;
 pub mod types;
 
-pub use storage::{PersistedState, StorageStore};
+pub use storage::{
+    is_simulator_saved_device, PersistedState, StorageStore, CURRENT_SCHEMA_VERSION,
+};
 pub use types::{
     AiAncActivityUi, AiAncMatrix, AiAncNoiseLevel, AiAncNoiseRow, AncPrimaryMode, AncScene,
     AncState, AppSettings, AppSettingsPatch, AppSnapshot, AppStatusSnapshot, AppTheme,
@@ -117,80 +119,88 @@ impl AppCore {
         let winrt_manager = Some(qcy_transport::WinrtBluetoothManager::new());
 
         let adapter = AdapterInfo {
-            is_present: true,
-            address: Some(BluetoothAddress::new(0x001A_7DDA_7111)),
-            is_classic_supported: true,
-            is_low_energy_supported: true,
+            is_present: false,
+            address: None,
+            is_classic_supported: false,
+            is_low_energy_supported: false,
             is_peripheral_supported: false,
             error: None,
         };
 
+        let sim_enabled = persisted.settings.simulator_enabled;
         let sim_snap = simulator.snapshot();
-        let initial_model = registry
-            .find_by_id(&sim_snap.model_id)
-            .cloned()
-            .unwrap_or_else(ModelRegistry::generic_fallback);
-        let initial_battery = sim_state_to_battery(&sim_snap, &initial_model);
-
-        let initial_device = DiscoveredDeviceInfo {
-            id: format!("virtual:{}", initial_model.model_id),
-            address: BluetoothAddress::from_bytes(sim_snap.class_mac).to_mac_string(),
-            name: sim_snap.device_name.clone(),
-            rssi: Some(-48),
-            transport_kind: TransportKind::Dual,
-            manufacturer_data: HashMap::from([(
-                COMPANY_ID_QCY,
-                sim_snap.build_advertisement(false).encode(),
-            )]),
-            service_uuids: vec![qcy_protocol::SVC_QCY_CUSTOM.to_string()],
-            is_paired: true,
-            is_connected: persisted.settings.simulator_enabled,
-            last_seen_ms: now_epoch_ms(),
-            model_id_hint: Some(initial_model.model_id.clone()),
-            numeric_model_id: initial_model.numeric_model_id,
-            is_virtual: true,
-        };
-
         let eq_state = EqState {
             custom_presets: persisted.custom_presets,
             ..EqState::default()
         };
 
         let mut saved_devices = persisted.saved_devices;
-        if saved_devices.is_empty() && persisted.settings.simulator_enabled {
-            saved_devices.push(SavedDeviceRecord {
-                address: initial_device.address.clone(),
-                name: initial_device.name.clone(),
-                model_id: initial_model.model_id.clone(),
-                color_index: sim_snap.color_index,
-                last_connected_ms: now_epoch_ms(),
-                last_battery: Some(initial_battery.clone()),
-                is_virtual: true,
-            });
+        if !sim_enabled {
+            saved_devices.retain(|d| !is_simulator_saved_device(d));
         }
 
-        let snapshot = AppSnapshot {
-            connection_state: if persisted.settings.simulator_enabled {
-                ConnectionState::Connected
-            } else {
-                ConnectionState::Disconnected
-            },
-            is_virtual_session: persisted.settings.simulator_enabled,
-            adapter,
-            active_device: if persisted.settings.simulator_enabled {
-                Some(initial_device)
-            } else {
-                None
-            },
-            firmware_version: sim_snap.firmware_version.to_string(),
-            device_color_index: sim_snap.color_index,
-            saved_devices,
-            battery: initial_battery.clone(),
-            anc: AncState::default(),
-            eq: eq_state,
-            gestures: GestureState::default(),
-            modes: ModesState::default(),
-            multipoint: MultipointState {
+        let (
+            initial_model,
+            initial_device,
+            initial_battery,
+            initial_firmware,
+            initial_color,
+            initial_anc,
+            initial_multipoint,
+            initial_ota,
+            initial_sim_state,
+        ) = if sim_enabled {
+            let model = registry
+                .find_by_id(&sim_snap.model_id)
+                .cloned()
+                .unwrap_or_else(ModelRegistry::generic_fallback);
+            let batt = sim_state_to_battery(&sim_snap, &model);
+            let dev = DiscoveredDeviceInfo {
+                id: format!("virtual:{}", model.model_id),
+                address: BluetoothAddress::from_bytes(sim_snap.class_mac).to_mac_string(),
+                name: sim_snap.device_name.clone(),
+                rssi: Some(-48),
+                transport_kind: TransportKind::Dual,
+                manufacturer_data: HashMap::from([(
+                    COMPANY_ID_QCY,
+                    sim_snap.build_advertisement(false).encode(),
+                )]),
+                service_uuids: vec![qcy_protocol::SVC_QCY_CUSTOM.to_string()],
+                is_paired: true,
+                is_connected: true,
+                last_seen_ms: now_epoch_ms(),
+                model_id_hint: Some(model.model_id.clone()),
+                numeric_model_id: model.numeric_model_id,
+                is_virtual: true,
+            };
+            if saved_devices.is_empty() {
+                saved_devices.push(SavedDeviceRecord {
+                    address: dev.address.clone(),
+                    name: dev.name.clone(),
+                    model_id: model.model_id.clone(),
+                    color_index: sim_snap.color_index,
+                    last_connected_ms: now_epoch_ms(),
+                    last_battery: Some(batt.clone()),
+                    is_virtual: true,
+                });
+            }
+            let fw = sim_snap.firmware_version.to_string();
+            let ota = OtaState {
+                phase: OtaPhaseUi::Idle,
+                ota_type: model.ota_type,
+                current_firmware: fw.clone(),
+                file_path: None,
+                progress_pct: 0.0,
+                message: None,
+            };
+            let sim_ctrl = SimulatorControlState {
+                enabled: true,
+                model_id: model.model_id.clone(),
+                lid_open: sim_snap.lid_open,
+                latency_ms: sim_snap.latency_ms,
+                battery: batt.clone(),
+            };
+            let mp = MultipointState {
                 dual_device: sim_snap.dual_connect,
                 multi_device: sim_snap.dual_connect,
                 hosts: vec![MultipointHostInfo {
@@ -199,25 +209,74 @@ impl AppCore {
                     is_this_device: true,
                     is_connected: true,
                 }],
-            },
-            rgb_lighting: RgbLightingState::default(),
-            focus_white_noise: FocusWhiteNoiseState::default(),
-            ota: OtaState {
+            };
+            (
+                model,
+                Some(dev),
+                batt,
+                fw,
+                sim_snap.color_index,
+                AncState::default(),
+                mp,
+                ota,
+                sim_ctrl,
+            )
+        } else {
+            let model = ModelRegistry::generic_fallback();
+            let ota = OtaState {
                 phase: OtaPhaseUi::Idle,
-                ota_type: initial_model.ota_type,
-                current_firmware: sim_snap.firmware_version.to_string(),
+                ota_type: model.ota_type,
+                current_firmware: String::new(),
                 file_path: None,
                 progress_pct: 0.0,
                 message: None,
+            };
+            let sim_ctrl = SimulatorControlState {
+                enabled: false,
+                model_id: sim_snap.model_id.clone(),
+                lid_open: false,
+                latency_ms: 0,
+                battery: BatteryTelemetry::default(),
+            };
+            (
+                model,
+                None,
+                BatteryTelemetry::default(),
+                String::new(),
+                0,
+                AncState {
+                    mode: AncPrimaryMode::Off,
+                    ..AncState::default()
+                },
+                MultipointState::default(),
+                ota,
+                sim_ctrl,
+            )
+        };
+
+        let snapshot = AppSnapshot {
+            connection_state: if sim_enabled {
+                ConnectionState::Connected
+            } else {
+                ConnectionState::Disconnected
             },
+            is_virtual_session: sim_enabled,
+            adapter,
+            active_device: initial_device,
+            firmware_version: initial_firmware,
+            device_color_index: initial_color,
+            saved_devices,
+            battery: initial_battery,
+            anc: initial_anc,
+            eq: eq_state,
+            gestures: GestureState::default(),
+            modes: ModesState::default(),
+            multipoint: initial_multipoint,
+            rgb_lighting: RgbLightingState::default(),
+            focus_white_noise: FocusWhiteNoiseState::default(),
+            ota: initial_ota,
             last_fit_test: None,
-            simulator: SimulatorControlState {
-                enabled: persisted.settings.simulator_enabled,
-                model_id: initial_model.model_id.clone(),
-                lid_open: sim_snap.lid_open,
-                latency_ms: sim_snap.latency_ms,
-                battery: initial_battery,
-            },
+            simulator: initial_sim_state,
             active_model: initial_model,
             settings: persisted.settings,
         };
@@ -264,16 +323,21 @@ impl AppCore {
     /// Backward-compatible legacy snapshot preserved so `src-tauri` compiles cleanly
     /// while concurrent shell modules are built.
     pub async fn status_snapshot(&self) -> AppStatusSnapshot {
-        let devices = self
-            .shared
-            .simulator
-            .list_paired_devices()
-            .await
-            .unwrap_or_default();
         let snap = self.get_app_snapshot();
+        let active_device = if snap.settings.simulator_enabled && snap.is_virtual_session {
+            self.shared
+                .simulator
+                .list_paired_devices()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .next()
+        } else {
+            None
+        };
         AppStatusSnapshot {
             connection_state: snap.connection_state,
-            active_device: devices.into_iter().next(),
+            active_device,
             active_model: snap.active_model,
             anc_mode: snap.anc.to_legacy_anc_mode(),
             gaming_mode: snap.modes.game_mode,
@@ -479,9 +543,12 @@ impl AppCore {
         let snap = {
             let mut st = self.shared.snapshot.lock().expect("snapshot lock");
             st.connection_state = ConnectionState::Disconnected;
-            if let Some(dev) = st.active_device.as_mut() {
-                dev.is_connected = false;
-            }
+            st.is_virtual_session = false;
+            st.active_device = None;
+            st.battery = BatteryTelemetry::default();
+            st.firmware_version.clear();
+            st.multipoint = MultipointState::default();
+            st.last_fit_test = None;
             st.clone()
         };
         self.emit_state(snap.clone());
@@ -2043,21 +2110,74 @@ impl AppCore {
     // -----------------------------------------------------------------------
 
     pub async fn set_simulator_enabled(&self, enabled: bool) -> CoreResult<AppSnapshot> {
-        {
-            let mut st = self.shared.snapshot.lock().expect("lock");
-            st.settings.simulator_enabled = enabled;
-            st.simulator.enabled = enabled;
-            st.is_virtual_session = enabled;
+        if !enabled {
+            let _ = self.stop_scan().await;
+            {
+                let mut link_guard = self.shared.link.lock().await;
+                if let Some(mut old) = link_guard.take() {
+                    old.abort_tasks();
+                    let _ = old.connection.disconnect().await;
+                }
+            }
+            let snap = {
+                let mut st = self.shared.snapshot.lock().expect("lock");
+                st.settings.simulator_enabled = false;
+                st.simulator.enabled = false;
+                st.simulator.lid_open = false;
+                st.simulator.battery = BatteryTelemetry::default();
+                st.is_virtual_session = false;
+                st.connection_state = ConnectionState::Disconnected;
+                st.active_device = None;
+                st.active_model = ModelRegistry::generic_fallback();
+                st.battery = BatteryTelemetry::default();
+                st.firmware_version.clear();
+                st.device_color_index = 0;
+                st.anc = AncState {
+                    mode: AncPrimaryMode::Off,
+                    ..AncState::default()
+                };
+                st.multipoint = MultipointState::default();
+                st.ota = OtaState {
+                    phase: OtaPhaseUi::Idle,
+                    ota_type: st.active_model.ota_type,
+                    current_firmware: String::new(),
+                    file_path: None,
+                    progress_pct: 0.0,
+                    message: None,
+                };
+                st.last_fit_test = None;
+                st.saved_devices.retain(|d| !is_simulator_saved_device(d));
+                st.clone()
+            };
+            self.persist_current()?;
+            self.emit_state(snap.clone());
+            return Ok(snap);
         }
-        self.persist_current()?;
 
-        if enabled {
-            let model_id = self.get_app_snapshot().simulator.model_id;
-            let addr = BluetoothAddress::from_bytes(self.shared.simulator.snapshot().class_mac)
-                .to_mac_string();
-            return self.connect_device(&addr, Some(&model_id)).await;
-        }
-        self.disconnect_device().await
+        let (model_id, addr) = {
+            let sim_snap = self.shared.simulator.snapshot();
+            let model = self
+                .shared
+                .registry
+                .find_by_id(&sim_snap.model_id)
+                .cloned()
+                .unwrap_or_else(ModelRegistry::generic_fallback);
+            let batt = sim_state_to_battery(&sim_snap, &model);
+            let mut st = self.shared.snapshot.lock().expect("lock");
+            st.settings.simulator_enabled = true;
+            st.simulator.enabled = true;
+            st.simulator.lid_open = sim_snap.lid_open;
+            st.simulator.battery = batt.clone();
+            st.battery = batt;
+            st.is_virtual_session = true;
+            let mid = st.simulator.model_id.clone();
+            (
+                mid,
+                BluetoothAddress::from_bytes(sim_snap.class_mac).to_mac_string(),
+            )
+        };
+        self.persist_current()?;
+        self.connect_device(&addr, Some(&model_id)).await
     }
 
     pub async fn set_simulator_model(&self, model_id: &str) -> CoreResult<AppSnapshot> {
@@ -2126,19 +2246,23 @@ impl AppCore {
 
             let mut st = self.shared.snapshot.lock().expect("lock");
             let has_case = st.active_model.capabilities.has_case_battery;
-            st.battery.left = Some(left);
-            st.battery.right = if has_case { Some(right) } else { None };
-            st.battery.case_level = if has_case { Some(case) } else { None };
-            st.battery.left_charging = lc;
-            st.battery.right_charging = rc;
-            st.battery.case_charging = cc;
+            let mut next_batt = st.simulator.battery.clone();
+            next_batt.left = Some(left);
+            next_batt.right = if has_case { Some(right) } else { None };
+            next_batt.case_level = if has_case { Some(case) } else { None };
+            next_batt.left_charging = lc;
+            next_batt.right_charging = rc;
+            next_batt.case_charging = cc;
             if let Some(lic) = b.left_in_case {
-                st.battery.left_in_case = lic;
+                next_batt.left_in_case = lic;
             }
             if let Some(ric) = b.right_in_case {
-                st.battery.right_in_case = ric;
+                next_batt.right_in_case = ric;
             }
-            st.simulator.battery = st.battery.clone();
+            if st.settings.simulator_enabled {
+                st.simulator.battery = next_batt.clone();
+                st.battery = next_batt;
+            }
         }
         let snap = self.get_app_snapshot();
         self.emit_state(snap.clone());
@@ -2198,6 +2322,17 @@ impl AppCore {
             if let Some(v) = patch.simulator_enabled {
                 st.settings.simulator_enabled = v;
                 st.simulator.enabled = v;
+                if !v && st.is_virtual_session {
+                    st.is_virtual_session = false;
+                    st.connection_state = ConnectionState::Disconnected;
+                    st.active_device = None;
+                    st.active_model = ModelRegistry::generic_fallback();
+                    st.battery = BatteryTelemetry::default();
+                    st.simulator.battery = BatteryTelemetry::default();
+                    st.firmware_version.clear();
+                    st.multipoint = MultipointState::default();
+                    st.saved_devices.retain(|d| !is_simulator_saved_device(d));
+                }
             }
             if let Some(v) = patch.developer_packet_log {
                 st.settings.developer_packet_log = v;
@@ -2316,18 +2451,14 @@ impl AppCore {
             st.is_virtual_session = is_virtual;
             st.active_model = profile.clone();
             st.ota.ota_type = profile.ota_type;
-            st.simulator.model_id = profile.model_id.clone();
-
-            if !profile.capabilities.has_case_battery {
-                st.battery.case_level = None;
-                st.battery.right = None;
-                st.simulator.battery.case_level = None;
-                st.simulator.battery.right = None;
-            } else if st.battery.case_level.is_none() {
-                st.battery.case_level = Some(76);
-                st.battery.right = Some(92);
-                st.simulator.battery.case_level = Some(76);
-                st.simulator.battery.right = Some(92);
+            if is_virtual {
+                let sim_snap = self.shared.simulator.snapshot();
+                let batt = sim_state_to_battery(&sim_snap, &profile);
+                st.simulator.model_id = profile.model_id.clone();
+                st.simulator.battery = batt.clone();
+                st.battery = batt;
+            } else {
+                st.battery = BatteryTelemetry::default();
             }
 
             st.active_device = Some(DiscoveredDeviceInfo {
@@ -2567,9 +2698,15 @@ impl AppCore {
         let persisted = {
             let st = self.shared.snapshot.lock().expect("lock");
             PersistedState {
+                schema_version: CURRENT_SCHEMA_VERSION,
                 settings: st.settings.clone(),
                 custom_presets: st.eq.custom_presets.clone(),
-                saved_devices: st.saved_devices.clone(),
+                saved_devices: st
+                    .saved_devices
+                    .iter()
+                    .filter(|d| !is_simulator_saved_device(d))
+                    .cloned()
+                    .collect(),
             }
         };
         self.shared.storage.save(&persisted)
@@ -2761,9 +2898,155 @@ mod tests {
     async fn app_core_provides_initial_snapshot() {
         let path = temp_storage_path("initial");
         let core = AppCore::with_storage_path(&path);
-        let snap = core.status_snapshot().await;
-        assert_eq!(snap.connection_state, ConnectionState::Connected);
-        assert!(snap.active_device.is_some());
+        let full = core.get_app_snapshot();
+        assert!(!full.settings.simulator_enabled);
+        assert!(!full.simulator.enabled);
+        assert!(!full.is_virtual_session);
+        assert_eq!(full.connection_state, ConnectionState::Disconnected);
+        assert!(full.active_device.is_none());
+        assert_eq!(full.battery, BatteryTelemetry::default());
+        assert!(full.battery.left.is_none());
+        assert!(full.battery.right.is_none());
+        assert!(full.battery.case_level.is_none());
+        assert!(full.saved_devices.is_empty());
+        assert!(full.multipoint.hosts.is_empty());
+
+        let legacy_snap = core.status_snapshot().await;
+        assert_eq!(legacy_snap.connection_state, ConnectionState::Disconnected);
+        assert!(legacy_snap.active_device.is_none());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn simulator_toggle_off_clears_virtual_device_and_battery() {
+        let path = temp_storage_path("sim_toggle_off");
+        let core = AppCore::with_storage_path(&path);
+        let mut events = core.subscribe_events();
+
+        // Explicit opt-in connects virtual N70 with live battery
+        let on_snap = core
+            .set_simulator_enabled(true)
+            .await
+            .expect("enable simulator");
+        assert!(on_snap.settings.simulator_enabled);
+        assert!(on_snap.is_virtual_session);
+        assert_eq!(on_snap.connection_state, ConnectionState::Connected);
+        assert!(on_snap.active_device.is_some());
+        assert!(on_snap.battery.left.is_some());
+
+        // Disabling simulator disconnects immediately, clears device/battery/virtual saved records, and emits StateUpdated
+        let off_snap = core
+            .set_simulator_enabled(false)
+            .await
+            .expect("disable simulator");
+        assert!(!off_snap.settings.simulator_enabled);
+        assert!(!off_snap.simulator.enabled);
+        assert!(!off_snap.is_virtual_session);
+        assert_eq!(off_snap.connection_state, ConnectionState::Disconnected);
+        assert!(off_snap.active_device.is_none());
+        assert_eq!(off_snap.battery, BatteryTelemetry::default());
+        assert!(off_snap.saved_devices.iter().all(|d| !d.is_virtual));
+
+        let mut saw_disconnected_event = false;
+        while let Ok(evt) = events.try_recv() {
+            if let CoreEvent::StateUpdated(s) = evt {
+                if s.connection_state == ConnectionState::Disconnected && s.active_device.is_none()
+                {
+                    saw_disconnected_event = true;
+                }
+            }
+        }
+        assert!(
+            saw_disconnected_event,
+            "disabling simulator must broadcast CoreEvent::StateUpdated with Disconnected state"
+        );
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn v1_to_v2_storage_migration_disables_default_simulator_and_scrubs_virtual_devices() {
+        let path = temp_storage_path("v1_migration");
+
+        // Write a legacy v0.1.0 / v0.1.1 state.json (missing schema_version, simulator_enabled=true, virtual + real devices)
+        let legacy_json = serde_json::json!({
+            "settings": {
+                "locale": "en-US",
+                "theme": "dark",
+                "minimize_to_tray": true,
+                "show_connection_popup": true,
+                "popup_duration_sec": 6,
+                "auto_start": false,
+                "virtual_simulator_enabled": true,
+                "developer_packet_log": false
+            },
+            "custom_presets": [
+                {
+                    "id": "user-flat",
+                    "eq_index": 99,
+                    "category": "custom",
+                    "name_en": "User Flat",
+                    "name_zh": "用户平直",
+                    "master_gain_db": 0.0,
+                    "gains_10band_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    "parametric_bands": []
+                }
+            ],
+            "saved_devices": [
+                {
+                    "address": "84:AC:60:5D:40:01",
+                    "name": "QCY MeloBuds N70",
+                    "model_id": "qcy-n70",
+                    "color_index": 0,
+                    "last_connected_ms": 1000,
+                    "last_battery": null,
+                    "is_virtual": true
+                },
+                {
+                    "address": "AA:BB:CC:11:22:33",
+                    "name": "Simulated Earbuds",
+                    "model_id": "qcy-ht08",
+                    "color_index": 0,
+                    "last_connected_ms": 1001,
+                    "last_battery": null,
+                    "is_virtual": false
+                },
+                {
+                    "address": "84:AC:60:99:88:77",
+                    "name": "Real QCY HT08",
+                    "model_id": "qcy-ht08",
+                    "color_index": 1,
+                    "last_connected_ms": 2000,
+                    "last_battery": null,
+                    "is_virtual": false
+                }
+            ]
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&legacy_json).unwrap())
+            .expect("write legacy state.json");
+
+        // Loading via AppCore must migrate v0/v1 -> v2 cleanly
+        let core = AppCore::with_storage_path(&path);
+        let snap = core.get_app_snapshot();
+        assert!(!snap.settings.simulator_enabled);
+        assert!(!snap.is_virtual_session);
+        assert_eq!(snap.connection_state, ConnectionState::Disconnected);
+        assert!(snap.active_device.is_none());
+        assert_eq!(snap.battery, BatteryTelemetry::default());
+        // User's real settings, custom presets, and real Bluetooth saved devices survive migration!
+        assert_eq!(snap.settings.locale, "en-US");
+        assert_eq!(snap.settings.theme, AppTheme::Dark);
+        assert_eq!(snap.eq.custom_presets.len(), 1);
+        assert_eq!(snap.saved_devices.len(), 1);
+        assert_eq!(snap.saved_devices[0].address, "84:AC:60:99:88:77");
+
+        // Verify persisted file on disk was upgraded to schema_version == 2
+        let persisted_raw = std::fs::read_to_string(&path).expect("read migrated file");
+        let persisted: PersistedState = serde_json::from_str(&persisted_raw).expect("parse v2");
+        assert_eq!(persisted.schema_version, CURRENT_SCHEMA_VERSION);
+        assert!(!persisted.settings.simulator_enabled);
+        assert_eq!(persisted.saved_devices.len(), 1);
+
         let _ = std::fs::remove_file(&path);
     }
 
@@ -2772,6 +3055,11 @@ mod tests {
         let path = temp_storage_path("e2e");
         let core = AppCore::with_storage_path(&path);
         let mut events = core.subscribe_events();
+
+        // Explicit simulator opt-in before running raw-byte virtual hardware E2E
+        core.set_simulator_enabled(true)
+            .await
+            .expect("enable simulator");
 
         // 1. Connect & switch across Unified TLV (N70), JieLi New (HT08-JL), JieLi Legacy (H3), and SP75 RGB
         let n70 = core.set_simulator_model("qcy-n70").await.expect("n70");
@@ -3023,6 +3311,11 @@ mod tests {
         // 2. Initial multipoint.multi_device matches dual_device (no false startup conflict)
         let init = core.get_app_snapshot();
         assert_eq!(init.multipoint.multi_device, init.multipoint.dual_device);
+
+        // Explicitly opt in to virtual simulator before wire-level simulator protocol checks
+        core.set_simulator_enabled(true)
+            .await
+            .expect("enable simulator");
 
         // 3. set_multipoint(multi_device: Some(true)) syncs dual_device and sends 0x24
         core.set_simulator_model("qcy-n70").await.expect("n70");

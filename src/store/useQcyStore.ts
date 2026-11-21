@@ -56,6 +56,7 @@ export interface QcyStoreValue {
 
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
+  refreshPairedDevices: () => Promise<void>;
   connectDevice: (address: string, modelId?: string) => Promise<void>;
   disconnectDevice: () => Promise<void>;
   removeSavedDevice: (address: string) => Promise<void>;
@@ -263,6 +264,20 @@ export const QcyStoreProvider: React.FC<QcyStoreProviderProps> = ({
         setIsScanning(false);
         await runSafe(() => client.stopScan());
       },
+      refreshPairedDevices: async () => {
+        const paired = await runSafe(() => client.listPairedDevices());
+        if (!paired) return;
+        setScannedDevices((prev) => {
+          const byAddr = new Map<string, DiscoveredDevice>();
+          for (const d of prev) byAddr.set(d.address.toUpperCase(), d);
+          for (const d of paired) {
+            const key = d.address.toUpperCase();
+            const existing = byAddr.get(key);
+            byAddr.set(key, existing ? { ...existing, ...d, rssi: d.rssi ?? existing.rssi } : d);
+          }
+          return Array.from(byAddr.values());
+        });
+      },
       connectDevice: async (address, modelId) => {
         const snap = await runSafe(() => client.connectDevice(address, modelId));
         if (snap) setSnapshot(snap);
@@ -384,7 +399,12 @@ export const QcyStoreProvider: React.FC<QcyStoreProviderProps> = ({
 
       setSimulatorEnabled: async (enabled) => {
         const snap = await runSafe(() => client.setSimulatorEnabled(enabled));
-        if (snap) setSnapshot(snap);
+        if (snap) {
+          setSnapshot(snap);
+          if (!enabled) {
+            setScannedDevices((prev) => prev.filter((d) => !d.is_virtual));
+          }
+        }
       },
       setSimulatorModel: async (modelId) => {
         const snap = await runSafe(() => client.setSimulatorModel(modelId));

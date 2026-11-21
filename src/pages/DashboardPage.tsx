@@ -15,6 +15,7 @@ import {
 import {
   AncControlPanel,
   BatteryOverviewCard,
+  DeviceDisconnectedState,
   RgbLightingControl,
   QCY_CARD_CLASS,
   QCY_SUBCARD_CLASS,
@@ -89,6 +90,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const {
     snapshot,
     loading,
+    startScan,
     setAncState,
     setAiAnc,
     setAncButtonCycle,
@@ -122,9 +124,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   if (!snapshot) {
     return (
-      <div className={`${QCY_CARD_CLASS} py-12 text-center text-sm text-[#808080] dark:text-white/55`}>
-        {t("dashboard.no_active_device")}
-      </div>
+      <DeviceDisconnectedState
+        variant="hero"
+        theme={uiTheme}
+        onScanAndConnect={() => {
+          onNavigate?.("devices");
+          void startScan();
+        }}
+        onOpenBluetoothSettings={() => void openWindowsBtSettings()}
+        t={t}
+      />
     );
   }
 
@@ -133,7 +142,39 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const caps = model.capabilities;
   const modelDisplayName = locale === "zh-CN" ? model.name_zh : model.name_en;
   const deviceTitle = device?.name || modelDisplayName;
-  const isDisconnected = snapshot.connection_state === "disconnected";
+  const isDisconnected = snapshot.connection_state === "disconnected" || !device;
+
+  if (isDisconnected) {
+    return (
+      <div className="space-y-5">
+        {!snapshot.is_virtual_session && !snapshot.adapter.is_present && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EAB308]/35 bg-[#EAB308]/10 px-4 py-3 text-xs text-[#854D0E] dark:text-[#FDE047]">
+            <span className="inline-flex items-center gap-2 font-medium">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {t("connection.bt_adapter_unavailable")}
+            </span>
+            <button
+              type="button"
+              onClick={() => void openWindowsBtSettings()}
+              className="rounded-lg bg-[#FF7A2F] px-3 py-1.5 font-semibold text-white hover:bg-[#E8691F]"
+            >
+              {t("connection.open_windows_bt_settings")}
+            </button>
+          </div>
+        )}
+        <DeviceDisconnectedState
+          variant="hero"
+          theme={uiTheme}
+          onScanAndConnect={() => {
+            onNavigate?.("devices");
+            void startScan();
+          }}
+          onOpenBluetoothSettings={() => void openWindowsBtSettings()}
+          t={t}
+        />
+      </div>
+    );
+  }
 
   const hasSpatialToggle = caps.spatial_audio_modes.length > 0;
   const spatialActive = modes.spatial_audio !== "off";

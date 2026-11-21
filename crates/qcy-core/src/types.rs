@@ -85,7 +85,7 @@ impl Default for AppSettings {
             show_connection_popup: true,
             popup_duration_sec: 5,
             auto_start: false,
-            simulator_enabled: true,
+            simulator_enabled: false,
             developer_packet_log: false,
         }
     }

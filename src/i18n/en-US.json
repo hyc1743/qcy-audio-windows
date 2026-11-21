@@ -107,8 +107,13 @@
     "switch_device": "Switch Device",
     "remove_device_confirm": "Remove {name} from saved devices? This does not unpair it from Windows.",
     "empty_list_title": "No QCY Devices Added",
-    "empty_list_desc": "Scan for nearby QCY Bluetooth devices or try the Virtual Earbuds Simulator.",
-    "last_connected": "Last connected: {time}"
+    "empty_list_desc": "Scan for nearby QCY Bluetooth devices or connect an already-paired device from Windows Bluetooth.",
+    "last_connected": "Last connected: {time}",
+    "show_all_bluetooth": "Show all nearby Bluetooth devices",
+    "qcy_match_badge": "QCY Match",
+    "paired_badge": "Paired",
+    "qcy_filter_hint": "Showing recognized QCY devices first. Enable \"Show all nearby Bluetooth devices\" to see newer or unlisted models.",
+    "no_qcy_devices_filtered": "No QCY devices matched ({total} other nearby Bluetooth devices found). Enable the toggle above to view all devices."
   },
   "dashboard": {
     "battery_status": "Battery Status",
@@ -684,7 +689,19 @@
     "about_license": "Open-Source License (MIT)",
     "about_open_source": "Zero telemetry, zero vendor accounts, 100% local Bluetooth control.",
     "about_privacy_note": "All device preferences, custom EQs, and connection logs remain strictly on your PC.",
-    "about_feedback_github": "Report an Issue on GitHub"
+    "about_feedback_github": "Report an Issue on GitHub",
+    "developer_section_title": "Developer & Offline Debug (Off by Default)",
+    "developer_section_desc": "Optional tools for testing UI layouts without physical hardware or inspecting raw Bluetooth packets. Leave off for normal use."
+  },
+  "empty_state": {
+    "no_device_title": "No Device Connected",
+    "no_device_desc": "Open your QCY charging case or power on your headphones, then scan for nearby devices or pair them in Windows Bluetooth settings.",
+    "scan_and_connect": "Scan & Connect",
+    "device_required_title": "No QCY Device Connected",
+    "device_required_desc": "Connect your QCY earbuds, headphones, or speaker first to adjust {feature}.",
+    "go_to_devices": "Go to Devices & Connect",
+    "tip_open_case": "Earbuds: Open the charging case lid or take them out so BLE advertising begins.",
+    "tip_windows_pair": "First-time setup: Pair audio (A2DP) in Windows Bluetooth settings for full playback & control."
   },
   "tray": {
     "tooltip_connected": "QCY Audio · {model} (L {left}% · R {right}%)",

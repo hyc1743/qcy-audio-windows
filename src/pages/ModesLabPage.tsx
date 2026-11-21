@@ -23,6 +23,7 @@ import {
 import { useQcyStore } from "../store/useQcyStore";
 import { useI18n } from "../i18n";
 import { playFitTestProbe } from "../audio/audioUtils";
+import { DeviceDisconnectedState } from "../components";
 import type { ListeningMode, PromptLanguage, SpatialAudioMode } from "../types/qcy";
 
 interface ToggleRowProps {
@@ -82,7 +83,11 @@ interface AlarmEntry {
   label: string;
 }
 
-export const ModesLabPage: React.FC = () => {
+export interface ModesLabPageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const ModesLabPage: React.FC<ModesLabPageProps> = ({ onNavigate }) => {
   const { snapshot, setModes, setMultipoint, runFitTest } = useQcyStore();
   const { t, locale } = useI18n();
 
@@ -105,6 +110,17 @@ export const ModesLabPage: React.FC = () => {
       <div className="rounded-2xl bg-white p-8 text-center text-sm text-neutral-500 dark:bg-[#1E1E1E] dark:text-neutral-400">
         {t("common.loading")}
       </div>
+    );
+  }
+
+  if (snapshot.connection_state === "disconnected" || !snapshot.active_device) {
+    return (
+      <DeviceDisconnectedState
+        variant="compact"
+        featureLabel={locale === "zh-CN" ? "模式与实验室" : "Modes & Lab"}
+        onGoToDevices={() => onNavigate?.("devices")}
+        t={t}
+      />
     );
   }
 

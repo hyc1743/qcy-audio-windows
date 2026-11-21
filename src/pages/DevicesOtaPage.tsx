@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bluetooth,
@@ -21,7 +21,38 @@ import {
 } from "lucide-react";
 import { useQcyStore } from "../store/useQcyStore";
 import { useI18n } from "../i18n";
-import type { DiscoveredDevice } from "../types/qcy";
+import type { DeviceModelProfile, DiscoveredDevice } from "../types/qcy";
+
+const QCY_COMPANY_IDS = new Set(["1822", "21020", "21036", "0x071e", "0x521c", "0x522c"]);
+const QCY_OUI_PREFIXES = ["84:AC:60", "1C:52:16", "C4:33:96"];
+
+/** Returns true if a scanned/paired Bluetooth device matches known QCY identifiers or name hints. */
+export function isLikelyQcyDevice(
+  dev: DiscoveredDevice,
+  models: readonly DeviceModelProfile[] = []
+): boolean {
+  if (dev.is_virtual) return true;
+  if (dev.model_id_hint || (dev.numeric_model_id !== null && dev.numeric_model_id !== undefined)) {
+    return true;
+  }
+  for (const key of Object.keys(dev.manufacturer_data ?? {})) {
+    if (QCY_COMPANY_IDS.has(key.toLowerCase())) return true;
+  }
+  for (const uuid of dev.service_uuids ?? []) {
+    const low = uuid.toLowerCase();
+    if (low.includes("0000a001") || low.includes("0000a002")) return true;
+  }
+  const upperMac = (dev.address ?? "").toUpperCase();
+  if (QCY_OUI_PREFIXES.some((oui) => upperMac.startsWith(oui))) return true;
+  const lowerName = (dev.name ?? "").toLowerCase();
+  if (lowerName.includes("qcy")) return true;
+  for (const m of models) {
+    if (m.ble_name_hints.some((hint) => hint.length >= 4 && lowerName.includes(hint.toLowerCase()))) {
+      return true;
+    }
+  }
+  return false;
+}
 
 const OTA_ROUTE_LABELS: Record<number, { name: string; transport: string }> = {
   0: { name: "Generic", transport: "N/A" },
@@ -63,11 +94,13 @@ function parseAdvBatteryPreview(
 export const DevicesOtaPage: React.FC = () => {
   const {
     snapshot,
+    models,
     scannedDevices,
     protocolLogs,
     isScanning,
     startScan,
     stopScan,
+    refreshPairedDevices,
     connectDevice,
     disconnectDevice,
     removeSavedDevice,
@@ -80,6 +113,7 @@ export const DevicesOtaPage: React.FC = () => {
   } = useQcyStore();
   const { t, locale } = useI18n();
 
+  const [showAllBluetooth, setShowAllBluetooth] = useState(false);
   const [renameInput, setRenameInput] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
   const [pendingReset, setPendingReset] = useState<
@@ -90,6 +124,30 @@ export const DevicesOtaPage: React.FC = () => {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const simulatorEnabled = Boolean(snapshot?.settings.simulator_enabled);
+
+  // Auto-populate already-paired Windows Bluetooth devices on mount when in live mode
+  useEffect(() => {
+    if (!simulatorEnabled) {
+      void refreshPairedDevices();
+    }
+  }, [simulatorEnabled, refreshPairedDevices]);
+
+  const sortedFilteredDevices = useMemo(() => {
+    const annotated = scannedDevices.map((dev) => ({
+      dev,
+      isQcy: isLikelyQcyDevice(dev, models),
+    }));
+    annotated.sort((a, b) => {
+      if (a.isQcy !== b.isQcy) return a.isQcy ? -1 : 1;
+      if (a.dev.is_paired !== b.dev.is_paired) return a.dev.is_paired ? -1 : 1;
+      const rssiA = a.dev.rssi ?? -999;
+      const rssiB = b.dev.rssi ?? -999;
+      return rssiB - rssiA;
+    });
+    return showAllBluetooth ? annotated : annotated.filter((entry) => entry.isQcy);
+  }, [scannedDevices, models, showAllBluetooth]);
+
   if (!snapshot) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center text-sm text-neutral-500 dark:bg-[#1E1E1E] dark:text-neutral-400">
@@ -99,6 +157,7 @@ export const DevicesOtaPage: React.FC = () => {
   }
 
   const { adapter, active_device, active_model, battery, saved_devices, ota } = snapshot;
+  const isDeviceConnected = Boolean(active_device && snapshot.connection_state === "connected");
   const otaRoute = OTA_ROUTE_LABELS[active_model.ota_type] ?? OTA_ROUTE_LABELS[0];
   const batteryOk =
     (battery.left === null || battery.left >= 30) &&
@@ -217,13 +276,47 @@ export const DevicesOtaPage: React.FC = () => {
             </button>
           </div>
 
-          {scannedDevices.length === 0 ? (
-            <div className="rounded-xl bg-[#F2F1F6] px-4 py-8 text-center text-xs text-neutral-500 dark:bg-white/5 dark:text-neutral-400">
-              {isScanning ? t("devices.scanning") : t("devices.no_devices_found")}
+          {/* Filter toggle: QCY matched devices first + optional Show All Nearby Bluetooth */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#F2F1F6]/80 px-3 py-2 text-xs dark:bg-white/[0.04]">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-medium text-neutral-700 dark:text-neutral-300">
+              <input
+                type="checkbox"
+                checked={showAllBluetooth}
+                onChange={(e) => setShowAllBluetooth(e.target.checked)}
+                className="h-3.5 w-3.5 accent-[#FF7A2F]"
+              />
+              <span>{t("devices.show_all_bluetooth")}</span>
+            </label>
+            <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+              {sortedFilteredDevices.length}/{scannedDevices.length}
+            </span>
+          </div>
+
+          {sortedFilteredDevices.length === 0 ? (
+            <div className="space-y-2 rounded-xl bg-[#F2F1F6] px-4 py-8 text-center text-xs text-neutral-500 dark:bg-white/5 dark:text-neutral-400">
+              <p>
+                {isScanning
+                  ? t("devices.scanning")
+                  : !showAllBluetooth && scannedDevices.length > 0
+                    ? t("devices.no_qcy_devices_filtered", { total: scannedDevices.length })
+                    : t("devices.no_devices_found")}
+              </p>
+              {!showAllBluetooth && scannedDevices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllBluetooth(true)}
+                  className="inline-flex items-center rounded-lg bg-[#0066FF]/12 px-3 py-1 font-semibold text-[#0066FF] hover:bg-[#0066FF]/20 dark:bg-[#3399FF]/15 dark:text-[#3399FF]"
+                >
+                  {t("devices.show_all_bluetooth")}
+                </button>
+              )}
+              {scannedDevices.length === 0 && !isScanning && (
+                <p className="text-[11px] opacity-80">{t("devices.qcy_filter_hint")}</p>
+              )}
             </div>
           ) : (
             <div className="space-y-2.5">
-              {scannedDevices.map((dev) => {
+              {sortedFilteredDevices.map(({ dev, isQcy }) => {
                 const advBat = parseAdvBatteryPreview(dev);
                 const isCurrent =
                   active_device?.address === dev.address &&
@@ -231,13 +324,27 @@ export const DevicesOtaPage: React.FC = () => {
                 return (
                   <div
                     key={dev.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-[#F2F1F6] p-3 dark:bg-white/5"
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
+                      isQcy
+                        ? "border-[#FF7A2F]/35 bg-[#FF7A2F]/[0.05] dark:border-[#FF7A2F]/35 dark:bg-[#FF7A2F]/[0.08]"
+                        : "border-transparent bg-[#F2F1F6] dark:bg-white/5"
+                    }`}
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
                           {dev.name || dev.address}
                         </span>
+                        {isQcy && !dev.is_virtual && (
+                          <span className="rounded-md bg-[#FF7A2F]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#FF7A2F]">
+                            {t("devices.qcy_match_badge")}
+                          </span>
+                        )}
+                        {dev.is_paired && !dev.is_virtual && (
+                          <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            {t("devices.paired_badge")}
+                          </span>
+                        )}
                         <span className="rounded-md bg-[#0066FF]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[#0066FF] dark:text-[#3399FF]">
                           {dev.is_virtual ? "SIM" : dev.transport_kind}
                         </span>
@@ -343,8 +450,10 @@ export const DevicesOtaPage: React.FC = () => {
         </section>
       </div>
 
-      {/* 3. Device Maintenance (Rename, Restore, Clear Pairing, Factory Reset) */}
-      <section className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-xs dark:border-white/10 dark:bg-[#1E1E1E]">
+      {/* 3 & 4. Device Maintenance + Local Firmware OTA Flasher — connected device only */}
+      {isDeviceConnected && (
+        <>
+          <section className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-xs dark:border-white/10 dark:bg-[#1E1E1E]">
         <h2 className="mb-4 text-sm font-semibold text-neutral-900 dark:text-white">
           {t("device_settings.section_maintenance")}
         </h2>
@@ -590,6 +699,8 @@ export const DevicesOtaPage: React.FC = () => {
           {t("ota.local_offline_disclaimer")}
         </p>
       </section>
+        </>
+      )}
 
       {/* 5. Collapsible Live Protocol Frame Inspector */}
       <section className="rounded-2xl border border-neutral-200/80 bg-white shadow-xs dark:border-white/10 dark:bg-[#1E1E1E]">

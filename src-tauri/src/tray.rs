@@ -11,6 +11,7 @@ pub const TRAY_ID: &str = "main-tray";
 pub const TRAY_ICON_SIZE: u32 = 32;
 
 pub const MENU_SHOW: &str = "tray_show";
+pub const MENU_STATUS_DISCONNECTED: &str = "tray_status_disconnected";
 pub const MENU_ANC_OFF: &str = "tray_anc_off";
 pub const MENU_ANC_ON: &str = "tray_anc_on";
 pub const MENU_ANC_TRANSPARENCY: &str = "tray_anc_transparency";
@@ -52,14 +53,14 @@ pub struct TrayBatteryVisual {
 impl Default for TrayBatteryVisual {
     fn default() -> Self {
         Self {
-            device_name: "QCY Audio".to_string(),
-            left: Some(88),
-            right: Some(92),
-            case_level: Some(76),
+            device_name: "QCY Audio Desktop".to_string(),
+            left: None,
+            right: None,
+            case_level: None,
             charging: false,
-            connected: true,
-            is_simulator: true,
-            anc_mode: TrayAncMode::NoiseCancellation,
+            connected: false,
+            is_simulator: false,
+            anc_mode: TrayAncMode::Off,
             game_mode: false,
         }
     }
@@ -67,6 +68,12 @@ impl Default for TrayBatteryVisual {
 
 impl TrayBatteryVisual {
     pub fn from_snapshot(snap: &AppSnapshot) -> Self {
+        let connected =
+            snap.connection_state == ConnectionState::Connected && snap.active_device.is_some();
+        if !connected {
+            return Self::default();
+        }
+
         let device_name = snap
             .active_device
             .as_ref()
@@ -88,7 +95,7 @@ impl TrayBatteryVisual {
             charging: snap.battery.left_charging
                 || snap.battery.right_charging
                 || snap.battery.case_charging,
-            connected: snap.connection_state == ConnectionState::Connected,
+            connected: true,
             is_simulator: snap.is_virtual_session,
             anc_mode,
             game_mode: snap.modes.game_mode || snap.modes.game_mode_pro,
@@ -99,7 +106,7 @@ impl TrayBatteryVisual {
 /// Formats a concise Windows notification-area tooltip summarizing active device telemetry.
 pub fn format_tray_tooltip(state: &TrayBatteryVisual) -> String {
     if !state.connected {
-        return "QCY Audio · Disconnected".to_string();
+        return "QCY Audio Desktop · Disconnected".to_string();
     }
 
     let mut parts = Vec::new();
@@ -308,6 +315,30 @@ pub fn build_tray_menu<R: Runtime>(
 ) -> tauri::Result<Menu<R>> {
     let show = MenuItem::with_id(app, MENU_SHOW, "Show QCY Audio", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
+    let open_bt = MenuItem::with_id(
+        app,
+        MENU_OPEN_BT_SETTINGS,
+        "Open Windows Bluetooth Settings",
+        true,
+        None::<&str>,
+    )?;
+    let sep_end = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
+
+    if !state.connected {
+        let status = MenuItem::with_id(
+            app,
+            MENU_STATUS_DISCONNECTED,
+            "No Device Connected",
+            false,
+            None::<&str>,
+        )?;
+        let sep2 = PredefinedMenuItem::separator(app)?;
+        return Menu::with_items(
+            app,
+            &[&show, &sep1, &status, &sep2, &open_bt, &sep_end, &quit],
+        );
+    }
 
     let anc_off_label = if state.anc_mode == TrayAncMode::Off {
         "● ANC: Off"
@@ -344,15 +375,6 @@ pub fn build_tray_menu<R: Runtime>(
         true,
         None::<&str>,
     )?;
-    let open_bt = MenuItem::with_id(
-        app,
-        MENU_OPEN_BT_SETTINGS,
-        "Open Windows Bluetooth Settings",
-        true,
-        None::<&str>,
-    )?;
-    let sep3 = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
 
     Menu::with_items(
         app,
@@ -366,7 +388,7 @@ pub fn build_tray_menu<R: Runtime>(
             &sep2,
             &preview_popup,
             &open_bt,
-            &sep3,
+            &sep_end,
             &quit,
         ],
     )
@@ -458,8 +480,13 @@ pub fn setup_tray<R: Runtime>(
                 });
             }
             MENU_PREVIEW_POPUP => {
-                let payload = core.build_popup_payload();
-                let _ = crate::popup::show_popup_window(app, Some(&payload));
+                let snap = core.get_app_snapshot();
+                if snap.connection_state == ConnectionState::Connected
+                    && snap.active_device.is_some()
+                {
+                    let payload = core.build_popup_payload();
+                    let _ = crate::popup::show_popup_window(app, Some(&payload));
+                }
             }
             MENU_OPEN_BT_SETTINGS => {
                 let _ = AppCore::open_windows_bt_settings();
@@ -587,7 +614,21 @@ mod tests {
         };
         assert_eq!(
             format_tray_tooltip(&disconnected),
-            "QCY Audio · Disconnected"
+            "QCY Audio Desktop · Disconnected"
         );
+
+        let default_visual = TrayBatteryVisual::default();
+        assert!(!default_visual.connected);
+        assert!(!default_visual.is_simulator);
+        assert!(default_visual.left.is_none());
+        assert!(default_visual.right.is_none());
+        assert!(default_visual.case_level.is_none());
+        assert_eq!(
+            format_tray_tooltip(&default_visual),
+            "QCY Audio Desktop · Disconnected"
+        );
+        let default_rgba = render_tray_icon_rgba(&default_visual);
+        assert!(contains_rgba(&default_rgba, [0x6E, 0x6E, 0x73, 0xFF]));
+        assert!(!contains_rgba(&default_rgba, [0xFF, 0x7A, 0x2F, 0xFF]));
     }
 }

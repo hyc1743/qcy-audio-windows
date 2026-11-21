@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { ArrowRight, Shield } from "lucide-react";
 import {
+  DeviceDisconnectedState,
   GestureRemapper,
   QCY_CARD_CLASS,
   type ButtonKeyId,
@@ -58,17 +59,20 @@ export const ControlsPage: React.FC<ControlsPageProps> = ({ onNavigate }) => {
     );
   }
 
-  if (!snapshot) {
+  if (!snapshot || snapshot.connection_state === "disconnected" || !snapshot.active_device) {
     return (
-      <div className={`${QCY_CARD_CLASS} py-12 text-center text-sm text-[#808080] dark:text-white/55`}>
-        {t("dashboard.no_active_device")}
-      </div>
+      <DeviceDisconnectedState
+        variant="compact"
+        featureLabel={t("app.nav.gestures")}
+        onGoToDevices={() => onNavigate?.("devices")}
+        t={t}
+      />
     );
   }
 
   const { active_model: model, gestures, connection_state } = snapshot;
   const caps = model.capabilities;
-  const isDisconnected = connection_state === "disconnected";
+  const isDisconnected = connection_state !== "connected";
 
   if (!caps.button_remap && !caps.head_controls) {
     return (

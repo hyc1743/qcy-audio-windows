@@ -41,6 +41,9 @@ if (-not $SkipSmokeTest) {
         if ($stdoutText -match "localhost:1420" -or $stdoutText -notmatch "dev_build=false" -or $stdoutText -notmatch "index_has_script=true") {
             throw "Binary is missing embedded frontend assets (devUrl detected). Rebuild with 'cargo build --release -p qcy-desktop --features custom-protocol' or 'npm run tauri -- build'."
         }
+        if ($stdoutText -notmatch "simulator_enabled=false" -or $stdoutText -notmatch "connection_state=disconnected" -or $stdoutText -notmatch "active_device=none") {
+            throw "Binary did not start in clean disconnected real-Bluetooth default state."
+        }
         if ($stdoutText -notmatch "main_url=https?://tauri\.localhost" -and $stdoutText -notmatch "main_url=tauri://localhost") {
             throw "Binary main_url is not serving embedded Tauri custom-protocol assets."
         }

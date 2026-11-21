@@ -235,35 +235,16 @@ const QcyShellInner: React.FC<ShellInnerProps> = ({ windowMode, initialTab }) =>
     setActiveTab(normalizeNavTab(tab));
   }, []);
 
-  // Build fallback popup payload for dedicated popup window before first event arrives
+  // In dedicated popup window mode, only render when an explicit popup event arrived or a live device is connected
   const effectivePopupPayload: PopupTriggerPayload | null = useMemo(() => {
     if (popupPayload) return popupPayload;
     if (windowMode !== "popup") return null;
-    if (!snapshot) {
-      return {
-        device_name: "QCY MeloBuds N70",
-        model_id: "qcy-n70",
-        form_factor: "tws",
-        color_index: 1,
-        battery: {
-          left: 88,
-          right: 84,
-          case_level: 65,
-          left_charging: false,
-          right_charging: false,
-          case_charging: false,
-          left_in_case: false,
-          right_in_case: false,
-          is_tws_connected: true,
-        },
-        anc_mode: "anc",
-        is_virtual: true,
-        auto_dismiss_ms: 5000,
-      };
+    if (!snapshot || !snapshot.active_device || snapshot.connection_state !== "connected") {
+      return null;
     }
     return {
       device_name:
-        snapshot.active_device?.name ||
+        snapshot.active_device.name ||
         (locale === "zh-CN" ? snapshot.active_model.name_zh : snapshot.active_model.name_en),
       model_id: snapshot.active_model.model_id,
       form_factor: snapshot.active_model.form_factor,
@@ -320,20 +301,30 @@ const QcyShellInner: React.FC<ShellInnerProps> = ({ windowMode, initialTab }) =>
     { id: "app_settings", label: t("app.nav.app_settings"), Icon: Settings },
   ];
 
-  const activeDeviceLabel = snapshot
+  const isConnected = Boolean(
+    snapshot && snapshot.connection_state === "connected" && snapshot.active_device
+  );
+  const isConnecting = Boolean(
+    snapshot &&
+      (snapshot.connection_state === "connecting" ||
+        snapshot.connection_state === "reconnecting")
+  );
+
+  const activeDeviceLabel = isConnected && snapshot
     ? snapshot.active_device?.name ||
       (locale === "zh-CN" ? snapshot.active_model.name_zh : snapshot.active_model.name_en)
-    : t("connection.not_connected");
+    : isConnecting
+      ? t("connection.connecting")
+      : t("empty_state.no_device_title");
 
-  const batterySummary = snapshot
+  const batterySummary = isConnected && snapshot
     ? snapshot.active_model.capabilities.has_case_battery
       ? `L ${snapshot.battery.left ?? "--"}% · R ${snapshot.battery.right ?? "--"}%`
       : `${snapshot.battery.left ?? snapshot.battery.right ?? "--"}%`
-    : "--";
+    : null;
 
-  const simulatorEnabled = Boolean(
-    snapshot?.simulator.enabled || snapshot?.settings.simulator_enabled
-  );
+  // NEVER expose simulator drawer button unless user explicitly enabled virtual simulator
+  const simulatorEnabled = Boolean(snapshot?.settings.simulator_enabled);
 
   const toggleLanguage = () => {
     const nextLocale: SupportedLocale = locale === "zh-CN" ? "en-US" : "zh-CN";
@@ -379,33 +370,39 @@ const QcyShellInner: React.FC<ShellInnerProps> = ({ windowMode, initialTab }) =>
               <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide">
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    snapshot?.connection_state === "connected"
-                      ? snapshot.is_virtual_session
+                    isConnected
+                      ? snapshot?.is_virtual_session
                         ? "bg-[#FF7A2F]"
                         : "bg-[#22C55E]"
-                      : "bg-[#9CA3AF]"
+                      : isConnecting
+                        ? "animate-pulse bg-[#EAB308]"
+                        : "bg-[#9CA3AF]"
                   }`}
                 />
                 <span
                   className={
-                    snapshot?.is_virtual_session
+                    isConnected && snapshot?.is_virtual_session
                       ? "text-[#FF7A2F]"
-                      : snapshot?.connection_state === "connected"
+                      : isConnected
                         ? "text-[#16A34A] dark:text-[#4ADE80]"
                         : "text-[#808080]"
                   }
                 >
-                  {snapshot?.is_virtual_session
+                  {isConnected && snapshot?.is_virtual_session
                     ? t("simulator.badge")
-                    : snapshot?.connection_state === "connected"
+                    : isConnected
                       ? t("connection.transport_ble")
-                      : t("connection.disconnected")}
+                      : isConnecting
+                        ? t("connection.connecting")
+                        : t("connection.not_connected")}
                 </span>
               </span>
-              <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-[#4D4D4D] dark:text-white/70">
-                <Battery className="h-3 w-3 text-[#22C55E]" />
-                {batterySummary}
-              </span>
+              {batterySummary && (
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-[#4D4D4D] dark:text-white/70">
+                  <Battery className="h-3 w-3 text-[#22C55E]" />
+                  {batterySummary}
+                </span>
+              )}
             </div>
             <p className="mt-1 truncate text-xs font-bold text-[#1A1A1A] dark:text-white">
               {activeDeviceLabel}
@@ -517,9 +514,9 @@ const QcyShellInner: React.FC<ShellInnerProps> = ({ windowMode, initialTab }) =>
 
           {/* Routed Active Page */}
           {activeTab === "dashboard" && <DashboardPage onNavigate={handleNavigate} />}
-          {activeTab === "eq" && <SoundEqPage />}
+          {activeTab === "eq" && <SoundEqPage onNavigate={handleNavigate} />}
           {activeTab === "gestures" && <ControlsPage onNavigate={handleNavigate} />}
-          {activeTab === "modes" && <ModesLabPage />}
+          {activeTab === "modes" && <ModesLabPage onNavigate={handleNavigate} />}
           {activeTab === "focus" && <SoundscapesPage />}
           {activeTab === "find" && <FindEarbudsPage />}
           {activeTab === "devices" && <DevicesOtaPage />}

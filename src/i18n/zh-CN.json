@@ -107,8 +107,13 @@
     "switch_device": "切换设备",
     "remove_device_confirm": "确定将 {name} 从已保存设备列表中移除吗？此操作不会取消 Windows 系统配对。",
     "empty_list_title": "尚未添加 QCY 设备",
-    "empty_list_desc": "扫描附近的 QCY 蓝牙设备，或使用虚拟耳机模拟器立即体验全部功能。",
-    "last_connected": "上次连接：{time}"
+    "empty_list_desc": "扫描附近的 QCY 蓝牙设备，或直接连接已在 Windows 中配对的耳机。",
+    "last_connected": "上次连接：{time}",
+    "show_all_bluetooth": "显示全部附近蓝牙设备",
+    "qcy_match_badge": "QCY 设备",
+    "paired_badge": "已配对",
+    "qcy_filter_hint": "优先展示已识别的 QCY 设备；如新款或未收录型号未显示，可开启“显示全部附近蓝牙设备”。",
+    "no_qcy_devices_filtered": "未匹配到 QCY 设备（附近发现 {total} 台其他蓝牙设备）。可开启上方开关查看全部设备。"
   },
   "dashboard": {
     "battery_status": "电量状态",
@@ -684,7 +689,19 @@
     "about_license": "开源许可证 (MIT)",
     "about_open_source": "零遥测追踪、无需厂商账号、100% 本地蓝牙控制。",
     "about_privacy_note": "所有设备偏好、自定义音效与连接历史仅保存在您的本机电脑中。",
-    "about_feedback_github": "前往 GitHub 反馈问题"
+    "about_feedback_github": "前往 GitHub 反馈问题",
+    "developer_section_title": "开发者与离线调试（默认关闭）",
+    "developer_section_desc": "仅用于在无实体硬件时体验界面或查看原始蓝牙协议报文，日常使用保持关闭即可。"
+  },
+  "empty_state": {
+    "no_device_title": "未连接设备",
+    "no_device_desc": "请打开 QCY 充电盒盖或开启设备电源，点击下方扫描并连接，或先在 Windows 蓝牙设置中完成配对。",
+    "scan_and_connect": "扫描并连接设备",
+    "device_required_title": "尚未连接 QCY 设备",
+    "device_required_desc": "请先连接您的 QCY 耳机或音箱，随后即可在此调整{feature}。",
+    "go_to_devices": "前往设备连接",
+    "tip_open_case": "真无线耳机：打开充电盒盖或取出耳机，使设备进入可发现状态。",
+    "tip_windows_pair": "首次使用：建议先在 Windows 蓝牙设置中完成音频通道（A2DP）配对。"
   },
   "tray": {
     "tooltip_connected": "QCY Audio · {model}（左 {left}% · 右 {right}%）",

@@ -390,12 +390,25 @@ class InMemoryQcyBackend {
   private scanListeners = new Set<(device: DiscoveredDevice) => void>();
   private logListeners = new Set<(entry: ProtocolLogEntry) => void>();
 
-  constructor() {
-    const initialModel = this.models[0];
-    const battery: BatteryTelemetry = {
+  private emptyBattery(): BatteryTelemetry {
+    return {
+      left: null,
+      right: null,
+      case_level: null,
+      left_charging: false,
+      right_charging: false,
+      case_charging: false,
+      left_in_case: false,
+      right_in_case: false,
+      is_tws_connected: false,
+    };
+  }
+
+  private defaultVirtualBattery(model: DeviceModelProfile): BatteryTelemetry {
+    return {
       left: 88,
       right: 92,
-      case_level: 76,
+      case_level: model.capabilities.has_case_battery ? 76 : null,
       left_charging: false,
       right_charging: false,
       case_charging: false,
@@ -403,11 +416,13 @@ class InMemoryQcyBackend {
       right_in_case: false,
       is_tws_connected: true,
     };
+  }
 
-    const virtualDevice: DiscoveredDevice = {
-      id: `virtual:${initialModel.model_id}`,
+  private buildVirtualDevice(model: DeviceModelProfile): DiscoveredDevice {
+    return {
+      id: `virtual:${model.model_id}`,
       address: "51:43:59:00:5D:40",
-      name: initialModel.name_en,
+      name: model.name_en,
       rssi: -46,
       transport_kind: "dual",
       manufacturer_data: {},
@@ -415,14 +430,19 @@ class InMemoryQcyBackend {
       is_paired: true,
       is_connected: true,
       last_seen_ms: Date.now(),
-      model_id_hint: initialModel.model_id,
-      numeric_model_id: initialModel.numeric_model_id,
+      model_id_hint: model.model_id,
+      numeric_model_id: model.numeric_model_id,
       is_virtual: true,
     };
+  }
+
+  constructor() {
+    const initialModel = this.models[0];
+    const emptyBat = this.emptyBattery();
 
     this.snapshot = {
-      connection_state: "connected",
-      is_virtual_session: true,
+      connection_state: "disconnected",
+      is_virtual_session: false,
       adapter: {
         is_present: true,
         address: "00:1A:7D:DA:71:11",
@@ -431,22 +451,12 @@ class InMemoryQcyBackend {
         is_peripheral_supported: false,
         error: null,
       },
-      active_device: virtualDevice,
+      active_device: null,
       active_model: initialModel,
-      firmware_version: "2.4.1-sim",
+      firmware_version: "",
       device_color_index: 1,
-      saved_devices: [
-        {
-          address: virtualDevice.address,
-          name: virtualDevice.name,
-          model_id: initialModel.model_id,
-          color_index: 1,
-          last_connected_ms: Date.now(),
-          last_battery: { ...battery },
-          is_virtual: true,
-        },
-      ],
-      battery,
+      saved_devices: [],
+      battery: emptyBat,
       anc: {
         mode: "anc",
         scene: "adaptive",
@@ -553,18 +563,18 @@ class InMemoryQcyBackend {
       ota: {
         phase: "idle",
         ota_type: initialModel.ota_type,
-        current_firmware: "2.4.1-sim",
+        current_firmware: "",
         file_path: null,
         progress_pct: 0,
         message: null,
       },
       last_fit_test: null,
       simulator: {
-        enabled: true,
+        enabled: false,
         model_id: initialModel.model_id,
         lid_open: true,
         latency_ms: 25,
-        battery: { ...battery },
+        battery: this.emptyBattery(),
       },
       settings: {
         locale: "zh-CN",
@@ -573,7 +583,7 @@ class InMemoryQcyBackend {
         show_connection_popup: true,
         popup_duration_sec: 5,
         auto_start: false,
-        simulator_enabled: true,
+        simulator_enabled: false,
         developer_packet_log: false,
       },
     };
@@ -1033,7 +1043,29 @@ class InMemoryQcyBackend {
     this.snapshot.simulator.enabled = enabled;
     this.snapshot.settings.simulator_enabled = enabled;
     this.snapshot.is_virtual_session = enabled;
-    this.snapshot.connection_state = enabled ? "connected" : "disconnected";
+    if (enabled) {
+      const model =
+        this.models.find((m) => m.model_id === this.snapshot.simulator.model_id) ??
+        this.models[0];
+      const vBat = this.defaultVirtualBattery(model);
+      const vDev = this.buildVirtualDevice(model);
+      this.snapshot.active_model = model;
+      this.snapshot.active_device = vDev;
+      this.snapshot.connection_state = "connected";
+      this.snapshot.firmware_version = "2.4.1-sim";
+      this.snapshot.ota.current_firmware = "2.4.1-sim";
+      this.snapshot.ota.ota_type = model.ota_type;
+      this.snapshot.battery = { ...vBat };
+      this.snapshot.simulator.battery = { ...vBat };
+    } else {
+      this.snapshot.connection_state = "disconnected";
+      this.snapshot.active_device = null;
+      this.snapshot.firmware_version = "";
+      this.snapshot.ota.current_firmware = "";
+      this.snapshot.battery = this.emptyBattery();
+      this.snapshot.simulator.battery = this.emptyBattery();
+      this.snapshot.saved_devices = this.snapshot.saved_devices.filter((d) => !d.is_virtual);
+    }
     return this.emitState();
   }
 
@@ -1042,18 +1074,15 @@ class InMemoryQcyBackend {
     this.snapshot.active_model = found;
     this.snapshot.simulator.model_id = found.model_id;
     this.snapshot.ota.ota_type = found.ota_type;
-    if (this.snapshot.active_device) {
-      this.snapshot.active_device.id = `virtual:${found.model_id}`;
-      this.snapshot.active_device.name = found.name_en;
-      this.snapshot.active_device.model_id_hint = found.model_id;
-      this.snapshot.active_device.numeric_model_id = found.numeric_model_id;
-    }
-    if (!found.capabilities.has_case_battery) {
-      this.snapshot.battery.case_level = null;
-      this.snapshot.simulator.battery.case_level = null;
-    } else if (this.snapshot.battery.case_level === null) {
-      this.snapshot.battery.case_level = 76;
-      this.snapshot.simulator.battery.case_level = 76;
+    if (this.snapshot.simulator.enabled) {
+      this.snapshot.active_device = this.buildVirtualDevice(found);
+      if (!found.capabilities.has_case_battery) {
+        this.snapshot.battery.case_level = null;
+        this.snapshot.simulator.battery.case_level = null;
+      } else if (this.snapshot.battery.case_level === null) {
+        this.snapshot.battery.case_level = 76;
+        this.snapshot.simulator.battery.case_level = 76;
+      }
     }
     return this.emitState();
   }

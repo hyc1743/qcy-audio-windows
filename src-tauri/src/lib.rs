@@ -4,6 +4,7 @@ pub mod popup;
 pub mod tray;
 
 use qcy_core::{AppCore, AppSettingsPatch, CoreEvent};
+use qcy_transport::ConnectionState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -36,50 +37,76 @@ pub fn is_embedded_app_url(url: &str) -> bool {
         || url.starts_with("tauri://localhost")
 }
 
-/// Validates smoke-test window URLs and embedded frontend asset integrity.
-#[allow(clippy::too_many_arguments)]
-pub fn validate_smoke_state(
-    require_embedded: bool,
-    dev_build: bool,
-    main_ok: bool,
-    popup_ok: bool,
-    main_url: &str,
-    popup_url: &str,
-    index_html_bytes: usize,
-    index_has_script: bool,
-) -> Result<(), Vec<String>> {
+/// Input bundle validated by `--smoke-test` during CI and local portable packaging.
+#[derive(Debug, Clone)]
+pub struct SmokeCheckInput<'a> {
+    pub require_embedded: bool,
+    pub dev_build: bool,
+    pub main_ok: bool,
+    pub popup_ok: bool,
+    pub main_url: &'a str,
+    pub popup_url: &'a str,
+    pub index_html_bytes: usize,
+    pub index_has_script: bool,
+    pub simulator_enabled: bool,
+    pub connection_state: ConnectionState,
+    pub has_active_device: bool,
+    pub battery_empty: bool,
+}
+
+/// Validates smoke-test startup defaults, window URLs, and embedded frontend asset integrity.
+pub fn validate_smoke_state(input: &SmokeCheckInput<'_>) -> Result<(), Vec<String>> {
     let mut failures = Vec::new();
-    if !main_ok {
+    if !input.main_ok {
         failures.push("main window missing".to_string());
     }
-    if !popup_ok {
+    if !input.popup_ok {
         failures.push("popup window missing".to_string());
     }
-    if require_embedded {
-        if dev_build {
+    if input.simulator_enabled {
+        failures.push("default startup must have simulator_enabled=false".to_string());
+    }
+    if input.connection_state != ConnectionState::Disconnected {
+        failures.push(format!(
+            "default startup must be disconnected (got {:?})",
+            input.connection_state
+        ));
+    }
+    if input.has_active_device {
+        failures.push("default startup must have active_device=none".to_string());
+    }
+    if !input.battery_empty {
+        failures.push("default startup must not fabricate battery levels".to_string());
+    }
+    if input.require_embedded {
+        if input.dev_build {
             failures.push(
                 "release binary compiled with cfg(dev) (missing custom-protocol feature)"
                     .to_string(),
             );
         }
-        if main_url.contains("localhost:1420") || popup_url.contains("localhost:1420") {
+        if input.main_url.contains("localhost:1420") || input.popup_url.contains("localhost:1420") {
             failures.push(format!(
-                "window navigated to devUrl localhost:1420 (main={main_url}, popup={popup_url})"
+                "window navigated to devUrl localhost:1420 (main={}, popup={})",
+                input.main_url, input.popup_url
             ));
         }
-        if !is_embedded_app_url(main_url) {
+        if !is_embedded_app_url(input.main_url) {
             failures.push(format!(
-                "main_url is not embedded custom protocol: {main_url}"
+                "main_url is not embedded custom protocol: {}",
+                input.main_url
             ));
         }
-        if !is_embedded_app_url(popup_url) {
+        if !is_embedded_app_url(input.popup_url) {
             failures.push(format!(
-                "popup_url is not embedded custom protocol: {popup_url}"
+                "popup_url is not embedded custom protocol: {}",
+                input.popup_url
             ));
         }
-        if index_html_bytes == 0 || !index_has_script {
+        if input.index_html_bytes == 0 || !input.index_has_script {
             failures.push(format!(
-                "embedded index.html invalid (bytes={index_html_bytes}, has_script={index_has_script})"
+                "embedded index.html invalid (bytes={}, has_script={})",
+                input.index_html_bytes, input.index_has_script
             ));
         }
     }
@@ -90,16 +117,34 @@ pub fn validate_smoke_state(
     }
 }
 
+fn connection_state_label(state: ConnectionState) -> &'static str {
+    match state {
+        ConnectionState::Disconnected => "disconnected",
+        ConnectionState::Connecting => "connecting",
+        ConnectionState::Connected => "connected",
+        ConnectionState::Reconnecting => "reconnecting",
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     let smoke_test = args.iter().any(|a| a == "--smoke-test");
     let start_minimized = args.iter().any(|a| a == "--minimized");
 
-    let core = if smoke_test {
-        let tmp = std::env::temp_dir().join("qcy_desktop_smoke_test_state.json");
+    let smoke_storage_path = if smoke_test {
+        let tmp = std::env::temp_dir().join(format!(
+            "qcy_desktop_smoke_test_state_{}.json",
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&tmp);
-        AppCore::with_storage_path(tmp)
+        Some(tmp)
+    } else {
+        None
+    };
+
+    let core = if let Some(ref tmp) = smoke_storage_path {
+        AppCore::with_storage_path(tmp.clone())
     } else {
         AppCore::new()
     };
@@ -300,23 +345,41 @@ pub fn run() {
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
 
-                    let validation = validate_smoke_state(
+                    let simulator_enabled = snap.settings.simulator_enabled;
+                    let conn_label = connection_state_label(snap.connection_state);
+                    let active_device_label = snap
+                        .active_device
+                        .as_ref()
+                        .map(|d| d.name.as_str())
+                        .unwrap_or("none");
+                    let battery_empty = snap.battery.left.is_none()
+                        && snap.battery.right.is_none()
+                        && snap.battery.case_level.is_none();
+
+                    let validation = validate_smoke_state(&SmokeCheckInput {
                         require_embedded,
                         dev_build,
                         main_ok,
                         popup_ok,
-                        &main_url,
-                        &popup_url,
+                        main_url: &main_url,
+                        popup_url: &popup_url,
                         index_html_bytes,
                         index_has_script,
-                    );
+                        simulator_enabled,
+                        connection_state: snap.connection_state,
+                        has_active_device: snap.active_device.is_some(),
+                        battery_empty,
+                    });
 
                     let exit_code = match validation {
                         Ok(()) => {
                             println!(
-                                "SMOKE_TEST_OK: models={} active_model={} adapter_present={} classic={} le={} main_win={} popup_win={} tray_registered={} tray_rgba_bytes={} dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
+                                "SMOKE_TEST_OK: models={} active_model={} simulator_enabled={} connection_state={} active_device={} adapter_present={} classic={} le={} main_win={} popup_win={} tray_registered={} tray_rgba_bytes={} dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
                                 models.len(),
                                 snap.active_model.model_id,
+                                simulator_enabled,
+                                conn_label,
+                                active_device_label,
                                 adapter.is_present,
                                 adapter.is_classic_supported,
                                 adapter.is_low_energy_supported,
@@ -335,8 +398,11 @@ pub fn run() {
                         }
                         Err(failures) => {
                             eprintln!(
-                                "SMOKE_TEST_FAIL: {} | dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
+                                "SMOKE_TEST_FAIL: {} | simulator_enabled={} connection_state={} active_device={} dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
                                 failures.join("; "),
+                                simulator_enabled,
+                                conn_label,
+                                active_device_label,
                                 dev_build,
                                 main_url,
                                 popup_url,
@@ -347,6 +413,10 @@ pub fn run() {
                             1
                         }
                     };
+
+                    if let Some(ref tmp) = smoke_storage_path {
+                        let _ = std::fs::remove_file(tmp);
+                    }
 
                     tokio::time::sleep(Duration::from_millis(150)).await;
                     let h_exit = h.clone();
@@ -384,32 +454,43 @@ mod tests {
     }
 
     #[test]
-    fn smoke_state_validation_blocks_localhost_dev_regression_in_release() {
-        assert!(validate_smoke_state(
-            true,
-            false,
-            true,
-            true,
-            "http://tauri.localhost/",
-            "http://tauri.localhost/index.html?window=popup",
-            480,
-            true,
-        )
+    fn smoke_state_validation_blocks_dev_url_and_default_simulator_regressions() {
+        assert!(validate_smoke_state(&SmokeCheckInput {
+            require_embedded: true,
+            dev_build: false,
+            main_ok: true,
+            popup_ok: true,
+            main_url: "http://tauri.localhost/",
+            popup_url: "http://tauri.localhost/index.html?window=popup",
+            index_html_bytes: 480,
+            index_has_script: true,
+            simulator_enabled: false,
+            connection_state: ConnectionState::Disconnected,
+            has_active_device: false,
+            battery_empty: true,
+        })
         .is_ok());
 
-        let err = validate_smoke_state(
-            true,
-            true,
-            true,
-            true,
-            "http://localhost:1420/",
-            "http://localhost:1420/index.html?window=popup",
-            0,
-            false,
-        )
+        let err = validate_smoke_state(&SmokeCheckInput {
+            require_embedded: true,
+            dev_build: true,
+            main_ok: true,
+            popup_ok: true,
+            main_url: "http://localhost:1420/",
+            popup_url: "http://localhost:1420/index.html?window=popup",
+            index_html_bytes: 0,
+            index_has_script: false,
+            simulator_enabled: true,
+            connection_state: ConnectionState::Connected,
+            has_active_device: true,
+            battery_empty: false,
+        })
         .unwrap_err();
         assert!(err.iter().any(|m| m.contains("custom-protocol")));
         assert!(err.iter().any(|m| m.contains("localhost:1420")));
         assert!(err.iter().any(|m| m.contains("embedded index.html")));
+        assert!(err.iter().any(|m| m.contains("simulator_enabled=false")));
+        assert!(err.iter().any(|m| m.contains("disconnected")));
+        assert!(err.iter().any(|m| m.contains("active_device=none")));
     }
 }

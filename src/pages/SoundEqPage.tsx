@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   DEFAULT_BUILTIN_PRESETS,
   DEFAULT_TARGET_CURVES,
+  DeviceDisconnectedState,
   HearingTestModal,
   ParametricEqCanvas,
   QCY_CARD_CLASS,
@@ -57,7 +58,11 @@ function parametricToWire(bands: readonly ParametricBand[]): WireParametricBand[
   }));
 }
 
-export const SoundEqPage: React.FC = () => {
+export interface SoundEqPageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const SoundEqPage: React.FC<SoundEqPageProps> = ({ onNavigate }) => {
   const {
     snapshot,
     loading,
@@ -120,17 +125,20 @@ export const SoundEqPage: React.FC = () => {
     );
   }
 
-  if (!snapshot) {
+  if (!snapshot || snapshot.connection_state === "disconnected" || !snapshot.active_device) {
     return (
-      <div className={`${QCY_CARD_CLASS} py-12 text-center text-sm text-[#808080] dark:text-white/55`}>
-        {t("dashboard.no_active_device")}
-      </div>
+      <DeviceDisconnectedState
+        variant="compact"
+        featureLabel={t("app.nav.eq")}
+        onGoToDevices={() => onNavigate?.("devices")}
+        t={t}
+      />
     );
   }
 
   const { eq, active_model: model, connection_state } = snapshot;
   const caps = model.capabilities;
-  const isDisconnected = connection_state === "disconnected";
+  const isDisconnected = connection_state !== "connected";
   const channelBalance0To100 = Math.round(
     Math.max(0, Math.min(100, (eq.channel_balance + 1) * 50))
   );

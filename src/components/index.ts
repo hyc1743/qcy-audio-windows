@@ -7,3 +7,4 @@ export * from "./RgbLightingControl";
 export * from "./HearingTestModal";
 export * from "./SoundscapePanel";
 export * from "./MutualExclusionDialog";
+export * from "./DeviceDisconnectedState";

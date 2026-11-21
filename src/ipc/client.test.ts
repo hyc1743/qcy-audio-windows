@@ -3,18 +3,34 @@ import { QcyIpcClient } from "./client";
 import type { AppSnapshot, PopupTriggerPayload } from "../types/qcy";
 
 describe("QcyIpcClient (in-memory fallback & IPC contract)", () => {
-  it("provides initial virtual snapshot, models catalog, and emits live state updates", async () => {
+  it("starts cleanly disconnected with zero virtual devices until simulator is explicitly enabled", async () => {
     const client = new QcyIpcClient({ forceMock: true });
     expect(client.isTauri).toBe(false);
 
     const updates: AppSnapshot[] = [];
     const unlisten = await client.onStateUpdated((s) => updates.push(s));
 
-    const snap = await client.getAppSnapshot();
-    expect(snap.connection_state).toBe("connected");
-    expect(snap.is_virtual_session).toBe(true);
-    expect(snap.active_model.model_id).toBe("qcy-n70");
-    expect(snap.anc.btn_anc_cfg).toEqual(["anc_adaptive", "transparency", "off"]);
+    // Clean default disconnected state (no fake earbuds out of the box)
+    const initial = await client.getAppSnapshot();
+    expect(initial.connection_state).toBe("disconnected");
+    expect(initial.is_virtual_session).toBe(false);
+    expect(initial.active_device).toBeNull();
+    expect(initial.saved_devices).toEqual([]);
+    expect(initial.settings.simulator_enabled).toBe(false);
+    expect(initial.simulator.enabled).toBe(false);
+    expect(initial.battery.left).toBeNull();
+    expect(initial.battery.right).toBeNull();
+    expect(initial.battery.case_level).toBeNull();
+    expect(initial.anc.btn_anc_cfg).toEqual(["anc_adaptive", "transparency", "off"]);
+    expect(await client.listPairedDevices()).toEqual([]);
+
+    // Explicit simulator opt-in connects virtual N70 cleanly
+    const simSnap = await client.setSimulatorEnabled(true);
+    expect(simSnap.connection_state).toBe("connected");
+    expect(simSnap.is_virtual_session).toBe(true);
+    expect(simSnap.active_device?.is_virtual).toBe(true);
+    expect(simSnap.active_model.model_id).toBe("qcy-n70");
+    expect(simSnap.battery.left).toBe(88);
 
     const models = await client.listModels();
     expect(models.length).toBeGreaterThanOrEqual(5);
@@ -28,13 +44,20 @@ describe("QcyIpcClient (in-memory fallback & IPC contract)", () => {
     expect(ancRes.snapshot.anc.mode).toBe("transparency");
     expect(ancRes.snapshot.anc.transparency_level).toBe(6);
     expect(ancRes.snapshot.anc.vocal_boost).toBe(true);
-    expect(updates.length).toBeGreaterThanOrEqual(1);
+    expect(updates.length).toBeGreaterThanOrEqual(2);
+
+    // Turning simulator off clears active device & battery cleanly
+    const afterOff = await client.setSimulatorEnabled(false);
+    expect(afterOff.connection_state).toBe("disconnected");
+    expect(afterOff.active_device).toBeNull();
+    expect(afterOff.battery.left).toBeNull();
 
     unlisten();
   });
 
   it("enforces popViewRules mutual exclusion between LDAC and Dual-Device with force override", async () => {
     const client = new QcyIpcClient({ forceMock: true });
+    await client.setSimulatorEnabled(true);
 
     // Enable Dual-Device first
     const dualRes = await client.setMultipoint({ dual_device: true });
@@ -58,6 +81,7 @@ describe("QcyIpcClient (in-memory fallback & IPC contract)", () => {
 
   it("supports custom EQ CRUD, JSON export/import roundtrip, and personalized EQ", async () => {
     const client = new QcyIpcClient({ forceMock: true });
+    await client.setSimulatorEnabled(true);
 
     await client.saveCustomEq({
       id: "studio-warm",
@@ -92,6 +116,7 @@ describe("QcyIpcClient (in-memory fallback & IPC contract)", () => {
 
   it("switches virtual models, triggers popup events, and flags otaType=9 auth notice", async () => {
     const client = new QcyIpcClient({ forceMock: true });
+    await client.setSimulatorEnabled(true);
 
     const popups: PopupTriggerPayload[] = [];
     const unlistenPopup = await client.onPopupTriggered((p) => popups.push(p));

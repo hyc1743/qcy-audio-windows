@@ -183,20 +183,22 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Connection Pop-Up Overlay + Preview Button */}
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
             <div>
               <p className="text-sm font-medium text-neutral-900 dark:text-white">
                 {t("app_settings.popup_on_connect")}
               </p>
             </div>
             <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => void handlePreviewPopup()}
-                className="rounded-xl bg-[#0066FF]/12 px-3 py-1.5 text-xs font-semibold text-[#0066FF] hover:bg-[#0066FF]/20 dark:bg-[#3399FF]/15 dark:text-[#3399FF]"
-              >
-                {t("simulator.trigger_popup_preview")}
-              </button>
+              {(snapshot.connection_state === "connected" || settings.simulator_enabled) && (
+                <button
+                  type="button"
+                  onClick={() => void handlePreviewPopup()}
+                  className="rounded-xl bg-[#0066FF]/12 px-3 py-1.5 text-xs font-semibold text-[#0066FF] hover:bg-[#0066FF]/20 dark:bg-[#3399FF]/15 dark:text-[#3399FF]"
+                >
+                  {t("simulator.trigger_popup_preview")}
+                </button>
+              )}
               <button
                 type="button"
                 role="switch"
@@ -220,9 +222,24 @@ export const SettingsPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      </section>
 
+      {/* Developer & Offline Debug (Off by Default) */}
+      <section className="rounded-2xl border border-dashed border-neutral-300/90 bg-white/90 p-5 shadow-xs dark:border-white/15 dark:bg-[#1E1E1E]/90">
+        <div className="mb-1 flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-neutral-500 dark:text-neutral-400" />
+          <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+            {t("app_settings.developer_section_title")}
+          </h2>
+        </div>
+        <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+          {t("app_settings.developer_section_desc")}
+        </p>
+
+        <div className="divide-y divide-neutral-200/70 dark:divide-white/10">
           {/* Virtual QCY Earbuds Simulator Toggle */}
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between py-3 first:pt-0">
             <div>
               <div className="flex items-center gap-2">
                 <Cpu className="h-4 w-4 text-[#FF7A2F]" />
@@ -296,7 +313,7 @@ export const SettingsPage: React.FC = () => {
                 {t("app_settings.about_title")}
               </h2>
               <span className="rounded-full bg-[#FF7A2F]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#FF7A2F]">
-                {t("app_settings.about_version", { version: "0.1.1" })}
+                {t("app_settings.about_version", { version: "0.1.2" })}
               </span>
               <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                 {t("app_settings.about_license")}

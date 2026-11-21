@@ -19,3 +19,9 @@ qcy-transport.workspace = true
 serde.workspace = true
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tokio.workspace = true
+
+[features]
+# Embeds `../dist` and serves it via Tauri's custom protocol (`http://tauri.localhost/`).
+# Enabled automatically by `npm run tauri -- build`, or manually via
+# `cargo build --release -p qcy-desktop --features custom-protocol`.
+custom-protocol = ["tauri/custom-protocol"]

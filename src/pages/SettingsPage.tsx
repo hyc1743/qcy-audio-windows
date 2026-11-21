@@ -296,7 +296,7 @@ export const SettingsPage: React.FC = () => {
                 {t("app_settings.about_title")}
               </h2>
               <span className="rounded-full bg-[#FF7A2F]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#FF7A2F]">
-                {t("app_settings.about_version", { version: "0.1.0" })}
+                {t("app_settings.about_version", { version: "0.1.1" })}
               </span>
               <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                 {t("app_settings.about_license")}

@@ -129,18 +129,18 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
-# 4. Run the desktop application locally (Tauri dev or direct Cargo run)
+# 4. Run the desktop application locally (Tauri dev with HMR, or embedded production assets)
 npm run tauri -- dev
-# or after `npm run build`:
-cargo run -p qcy-desktop
+# or after `npm run build` (embeds `dist/` via `custom-protocol`):
+cargo run -p qcy-desktop --features custom-protocol
 ```
 
 ### Packaging for Windows Distribution
 
 ```powershell
-# Portable x64 ZIP (automatically bundles WebView2Loader.dll on GNU toolchains)
+# Portable x64 ZIP (embeds `dist/`, verifies `--smoke-test`, and bundles WebView2Loader.dll on GNU)
 npm run build
-cargo build --release -p qcy-desktop
+cargo build --release -p qcy-desktop --features custom-protocol
 pwsh -File scripts/package-portable.ps1
 # Output: dist-portable/qcy-desktop-windows-x64-portable.zip + SHA-256 checksum
 
@@ -216,11 +216,12 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
-# 启动本地桌面应用
+# 启动本地桌面应用（热重载开发模式）
 npm run tauri -- dev
 
-# 打包 Windows x64 便携版 ZIP（自动处理 WebView2Loader.dll）
-cargo build --release -p qcy-desktop
+# 打包 Windows x64 便携版 ZIP（内嵌 dist/、自动校验 --smoke-test 并处理 WebView2Loader.dll）
+npm run build
+cargo build --release -p qcy-desktop --features custom-protocol
 pwsh -File scripts/package-portable.ps1
 
 # 构建 Windows NSIS 安装包（MSVC 工具链）

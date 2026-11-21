@@ -1,6 +1,14 @@
 fn main() {
     tauri_build::build();
 
+    if std::env::var("PROFILE").as_deref() == Ok("release") && tauri_build::is_dev() {
+        println!(
+            "cargo::warning=Building qcy-desktop in release profile WITHOUT `custom-protocol`! \
+             The binary will try to load devUrl (http://localhost:1420) instead of embedded ../dist. \
+             Pass `--features custom-protocol` or use `npm run tauri -- build`."
+        );
+    }
+
     // Tauri's build script attaches the Windows Common-Controls v6 manifest (required by
     // comctl32.dll!TaskDialogIndirect in muda/tray-icon) via `rustc-link-arg-bins`, which
     // does not cover `--lib` unit-test harnesses.

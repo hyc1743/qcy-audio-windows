@@ -29,6 +29,67 @@ impl ShellRuntime {
     }
 }
 
+/// Returns `true` when a WebView URL points to Tauri's embedded custom-protocol origin.
+pub fn is_embedded_app_url(url: &str) -> bool {
+    url.starts_with("http://tauri.localhost")
+        || url.starts_with("https://tauri.localhost")
+        || url.starts_with("tauri://localhost")
+}
+
+/// Validates smoke-test window URLs and embedded frontend asset integrity.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_smoke_state(
+    require_embedded: bool,
+    dev_build: bool,
+    main_ok: bool,
+    popup_ok: bool,
+    main_url: &str,
+    popup_url: &str,
+    index_html_bytes: usize,
+    index_has_script: bool,
+) -> Result<(), Vec<String>> {
+    let mut failures = Vec::new();
+    if !main_ok {
+        failures.push("main window missing".to_string());
+    }
+    if !popup_ok {
+        failures.push("popup window missing".to_string());
+    }
+    if require_embedded {
+        if dev_build {
+            failures.push(
+                "release binary compiled with cfg(dev) (missing custom-protocol feature)"
+                    .to_string(),
+            );
+        }
+        if main_url.contains("localhost:1420") || popup_url.contains("localhost:1420") {
+            failures.push(format!(
+                "window navigated to devUrl localhost:1420 (main={main_url}, popup={popup_url})"
+            ));
+        }
+        if !is_embedded_app_url(main_url) {
+            failures.push(format!(
+                "main_url is not embedded custom protocol: {main_url}"
+            ));
+        }
+        if !is_embedded_app_url(popup_url) {
+            failures.push(format!(
+                "popup_url is not embedded custom protocol: {popup_url}"
+            ));
+        }
+        if index_html_bytes == 0 || !index_has_script {
+            failures.push(format!(
+                "embedded index.html invalid (bytes={index_html_bytes}, has_script={index_has_script})"
+            ));
+        }
+    }
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -180,6 +241,14 @@ pub fn run() {
                 let h = app_handle.clone();
                 let main_ok = app.get_webview_window("main").is_some();
                 let popup_ok = app.get_webview_window("popup").is_some();
+                let dev_build = cfg!(dev);
+                let require_embedded = cfg!(not(debug_assertions)) || !dev_build;
+                let embedded_index = app.asset_resolver().get("index.html".into());
+                let index_html_bytes = embedded_index.as_ref().map(|a| a.bytes.len()).unwrap_or(0);
+                let index_has_script = embedded_index
+                    .as_ref()
+                    .map(|a| String::from_utf8_lossy(&a.bytes).contains("<script"))
+                    .unwrap_or(false);
 
                 tauri::async_runtime::spawn(async move {
                     let models = c.list_models();
@@ -197,25 +266,93 @@ pub fn run() {
                     });
                     let _ = rx.await;
 
-                    println!(
-                        "SMOKE_TEST_OK: models={} active_model={} adapter_present={} classic={} le={} main_win={} popup_win={} tray_registered={} tray_rgba_bytes={}",
-                        models.len(),
-                        snap.active_model.model_id,
-                        adapter.is_present,
-                        adapter.is_classic_supported,
-                        adapter.is_low_energy_supported,
+                    // Wait briefly for WebView2 initial navigation so win.url() settles
+                    // (up to 10s ceiling for cold CI runners; exits immediately once settled).
+                    let mut main_url = String::new();
+                    let mut popup_url = String::new();
+                    for _ in 0..100 {
+                        let (url_tx, url_rx) = tokio::sync::oneshot::channel();
+                        let h_urls = h.clone();
+                        let _ = h.run_on_main_thread(move || {
+                            let m = h_urls
+                                .get_webview_window("main")
+                                .and_then(|w| w.url().ok())
+                                .map(|u| u.to_string())
+                                .unwrap_or_default();
+                            let p = h_urls
+                                .get_webview_window("popup")
+                                .and_then(|w| w.url().ok())
+                                .map(|u| u.to_string())
+                                .unwrap_or_default();
+                            let _ = url_tx.send((m, p));
+                        });
+                        if let Ok((m, p)) = url_rx.await {
+                            main_url = m;
+                            popup_url = p;
+                        }
+                        let settled = !main_url.is_empty()
+                            && main_url != "about:blank"
+                            && !popup_url.is_empty()
+                            && popup_url != "about:blank";
+                        if settled {
+                            break;
+                        }
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+
+                    let validation = validate_smoke_state(
+                        require_embedded,
+                        dev_build,
                         main_ok,
                         popup_ok,
-                        tray_registered,
-                        tray_rgba_len
+                        &main_url,
+                        &popup_url,
+                        index_html_bytes,
+                        index_has_script,
                     );
-                    let _ = std::io::Write::flush(&mut std::io::stdout());
 
-                    tokio::time::sleep(Duration::from_millis(250)).await;
+                    let exit_code = match validation {
+                        Ok(()) => {
+                            println!(
+                                "SMOKE_TEST_OK: models={} active_model={} adapter_present={} classic={} le={} main_win={} popup_win={} tray_registered={} tray_rgba_bytes={} dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
+                                models.len(),
+                                snap.active_model.model_id,
+                                adapter.is_present,
+                                adapter.is_classic_supported,
+                                adapter.is_low_energy_supported,
+                                main_ok,
+                                popup_ok,
+                                tray_registered,
+                                tray_rgba_len,
+                                dev_build,
+                                main_url,
+                                popup_url,
+                                index_html_bytes,
+                                index_has_script
+                            );
+                            let _ = std::io::Write::flush(&mut std::io::stdout());
+                            0
+                        }
+                        Err(failures) => {
+                            eprintln!(
+                                "SMOKE_TEST_FAIL: {} | dev_build={} main_url={} popup_url={} index_html_bytes={} index_has_script={}",
+                                failures.join("; "),
+                                dev_build,
+                                main_url,
+                                popup_url,
+                                index_html_bytes,
+                                index_has_script
+                            );
+                            let _ = std::io::Write::flush(&mut std::io::stderr());
+                            1
+                        }
+                    };
+
+                    tokio::time::sleep(Duration::from_millis(150)).await;
                     let h_exit = h.clone();
                     let _ = h.run_on_main_thread(move || {
                         tray::teardown_tray(&h_exit);
-                        h_exit.exit(0);
+                        h_exit.exit(exit_code);
                     });
                 });
             }
@@ -224,4 +361,55 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running QCY Audio Desktop");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_app_url_classifier_accepts_custom_protocol_and_rejects_dev_url() {
+        assert!(is_embedded_app_url("http://tauri.localhost/"));
+        assert!(is_embedded_app_url(
+            "http://tauri.localhost/index.html?window=popup"
+        ));
+        assert!(is_embedded_app_url("https://tauri.localhost/"));
+        assert!(is_embedded_app_url("tauri://localhost/"));
+        assert!(!is_embedded_app_url("http://localhost:1420/"));
+        assert!(!is_embedded_app_url(
+            "http://localhost:1420/index.html?window=popup"
+        ));
+        assert!(!is_embedded_app_url("about:blank"));
+        assert!(!is_embedded_app_url(""));
+    }
+
+    #[test]
+    fn smoke_state_validation_blocks_localhost_dev_regression_in_release() {
+        assert!(validate_smoke_state(
+            true,
+            false,
+            true,
+            true,
+            "http://tauri.localhost/",
+            "http://tauri.localhost/index.html?window=popup",
+            480,
+            true,
+        )
+        .is_ok());
+
+        let err = validate_smoke_state(
+            true,
+            true,
+            true,
+            true,
+            "http://localhost:1420/",
+            "http://localhost:1420/index.html?window=popup",
+            0,
+            false,
+        )
+        .unwrap_err();
+        assert!(err.iter().any(|m| m.contains("custom-protocol")));
+        assert!(err.iter().any(|m| m.contains("localhost:1420")));
+        assert!(err.iter().any(|m| m.contains("embedded index.html")));
+    }
 }

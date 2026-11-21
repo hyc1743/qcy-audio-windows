@@ -2584,7 +2584,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qcy-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qcy-models",
  "qcy-protocol",
@@ -2599,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "qcy-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qcy-core",
  "qcy-models",
@@ -2612,7 +2612,7 @@ dependencies = [
 
 [[package]]
 name = "qcy-models"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qcy-protocol",
  "qcy-transport",
@@ -2622,7 +2622,7 @@ dependencies = [
 
 [[package]]
 name = "qcy-protocol"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2632,7 +2632,7 @@ dependencies = [
 
 [[package]]
 name = "qcy-simulator"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "qcy-models",
@@ -2645,7 +2645,7 @@ dependencies = [
 
 [[package]]
 name = "qcy-transport"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "serde",

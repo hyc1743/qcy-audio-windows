@@ -42,6 +42,23 @@ jobs:
       - name: Build Tauri NSIS installer & release binary (MSVC)
         run: npm run tauri -- build --bundles nsis
 
+      - name: Verify release binary embedded frontend (--smoke-test)
+        shell: pwsh
+        run: |
+          $out = [System.IO.Path]::GetTempFileName()
+          $err = [System.IO.Path]::GetTempFileName()
+          $p = Start-Process -FilePath "target\release\qcy-desktop.exe" -ArgumentList "--smoke-test" -Wait -PassThru `
+            -RedirectStandardOutput $out -RedirectStandardError $err
+          $stdout = Get-Content -Raw $out -ErrorAction SilentlyContinue
+          $stderr = Get-Content -Raw $err -ErrorAction SilentlyContinue
+          if ($stdout) { Write-Host $stdout }
+          if ($stderr) { Write-Host $stderr }
+          Remove-Item -Force -ErrorAction SilentlyContinue $out, $err
+          if ($p.ExitCode -ne 0) { throw "smoke-test exited with $($p.ExitCode)" }
+          if ($stdout -notmatch "SMOKE_TEST_OK:" -or $stdout -match "localhost:1420" -or $stdout -notmatch "dev_build=false" -or $stdout -notmatch "index_has_script=true") {
+            throw "smoke-test did not verify embedded custom-protocol assets"
+          }
+
       - name: Package Portable ZIP & SHA256SUMS
         shell: pwsh
         run: |
